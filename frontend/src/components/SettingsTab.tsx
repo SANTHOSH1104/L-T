@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   CheckCircle2, 
   Clock, 
@@ -9,10 +9,16 @@ import {
   Sliders,
   Database,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  Moon,
+  Sun,
+  Flame,
+  HelpCircle,
+  Play,
+  ArrowRight
 } from 'lucide-react';
 import { ShiftConfig, ShiftDefinition } from '../types/attendance';
-import { DEFAULT_SHIFT_CONFIG, DEFAULT_SHIFTS } from '../utils/calculator';
+import { DEFAULT_SHIFT_CONFIG, DEFAULT_SHIFTS, processAttendanceRecord } from '../utils/calculator';
 import { clearAllLogsInDb } from '../services/api';
 
 interface SettingsTabProps {
@@ -34,16 +40,39 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
+  // Live Rule Simulator State
+  const [simInTime, setSimInTime] = useState('08:35');
+  const [simOutTime, setSimOutTime] = useState('19:45');
+  const [simShift, setSimShift] = useState('KG');
+
+  // Preview simulation
+  const simResult = useMemo(() => {
+    const activeConfig: ShiftConfig = { ...formData, shifts };
+    return processAttendanceRecord(
+      'sim_1',
+      'SIM101',
+      'Test Employee',
+      'Engineering',
+      '2026-10-01',
+      simInTime,
+      simOutTime,
+      activeConfig,
+      { shift: simShift }
+    );
+  }, [formData, shifts, simInTime, simOutTime, simShift]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSaveConfig({ ...formData, shifts });
     setSavedAlert(true);
-    setTimeout(() => setSavedAlert(false), 3000);
+    setTimeout(() => setSavedAlert(false), 3500);
   };
 
   const handleResetDefaults = () => {
-    setFormData(DEFAULT_SHIFT_CONFIG);
-    setShifts(DEFAULT_SHIFTS);
+    if (window.confirm('Reset all shift timings and calculation rules back to factory defaults?')) {
+      setFormData(DEFAULT_SHIFT_CONFIG);
+      setShifts(DEFAULT_SHIFTS);
+    }
   };
 
   const handleUpdateShift = (index: number, field: keyof ShiftDefinition, value: any) => {
@@ -68,153 +97,195 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900">Shift & Calculation Policy Settings</h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Configure working hours, half-day thresholds, late arrival grace time, and overtime rules.
+    <div className="w-full space-y-6">
+      {/* 1. TOP HEADER BANNER - Matches Overview & Company Leave design */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 sm:p-7 text-white shadow-xl border border-indigo-900/40 flex flex-col md:flex-row md:items-center justify-between gap-5 relative overflow-hidden">
+        <div className="absolute right-0 top-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div className="space-y-2 relative z-10">
+          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-xs font-semibold">
+            <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+            <span>POLICY ENGINE & MULTI-SHIFT CONFIGURATION</span>
+          </div>
+
+          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+            Shift Timings & Calculation Rules
+          </h2>
+
+          <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
+            Configure biometric rules for General and Rotational Shifts (`KG`, `K1`, `K2`, `K3`, `K6`), full-day thresholds, grace minutes, and overtime qualifications.
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleResetDefaults}
-          className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors self-start sm:self-auto"
-        >
-          <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
-          <span>Reset Defaults</span>
-        </button>
+        {/* Action Buttons in Banner */}
+        <div className="flex items-center gap-3 shrink-0 relative z-10">
+          <button
+            type="button"
+            onClick={handleResetDefaults}
+            className="px-3.5 py-2.5 rounded-xl border border-slate-700 hover:border-slate-500 bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold transition-all flex items-center space-x-2 cursor-pointer shadow-xs"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+            <span>Reset Defaults</span>
+          </button>
+
+          <button
+            onClick={handleSubmit}
+            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-bold text-xs sm:text-sm flex items-center space-x-2 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer active:scale-98"
+          >
+            <Sparkles className="w-4 h-4 text-amber-300" />
+            <span>Save & Apply Policy</span>
+          </button>
+        </div>
       </div>
 
+      {/* Success Notification Alert */}
       {savedAlert && (
-        <div className="p-4 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold flex items-center space-x-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-          <span>Settings saved! All attendance and overtime records have been automatically recalculated.</span>
+        <div className="p-4 rounded-2xl bg-emerald-50 text-emerald-900 border border-emerald-300 text-xs font-bold flex items-center space-x-3 shadow-xs animate-in fade-in duration-200">
+          <div className="w-7 h-7 rounded-lg bg-emerald-500 text-white flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-4 h-4" />
+          </div>
+          <div>
+            <div>Settings successfully saved to XAMPP MySQL database!</div>
+            <div className="text-[11px] text-emerald-700 font-normal">All attendance records and overtime totals have been automatically recalculated.</div>
+          </div>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-6">
-        {/* Company Profile */}
-        <div>
-          <div className="flex items-center space-x-2 text-slate-800 font-bold text-sm mb-3">
-            <Building2 className="w-4 h-4 text-indigo-600" />
-            <span>Organization Profile</span>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Company / Organization Name</label>
-            <input
-              type="text"
-              value={formData.companyName}
-              onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 outline-hidden font-medium"
-            />
-          </div>
-        </div>
-
-        {/* Shift Timings */}
-        <div className="border-t border-slate-100 pt-5">
-          <div className="flex items-center space-x-2 text-slate-800 font-bold text-sm mb-3">
-            <Clock className="w-4 h-4 text-indigo-600" />
-            <span>Default Shift Timings (Fallback)</span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Shift Start Time (24h or HH:MM)</label>
-              <input
-                type="text"
-                value={formData.shiftStart}
-                onChange={(e) => setFormData({ ...formData, shiftStart: e.target.value })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 font-mono text-slate-800"
-                placeholder="08:30"
-              />
-              <p className="text-[11px] text-slate-400 mt-1">Default start time for general shift</p>
+      {/* Main Form */}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* CARD 1: Organization & Primary Company Identity */}
+        <div className="bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-6 shadow-xs space-y-4">
+          <div className="flex items-center space-x-3 border-b border-slate-100 pb-3">
+            <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <Building2 className="w-5 h-5" />
             </div>
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Shift End Time (24h or HH:MM)</label>
+              <h3 className="font-bold text-slate-900 text-base">Organization Profile & Company Branding</h3>
+              <p className="text-xs text-slate-400">Displayed on Excel reports, timesheets, and system header</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Company / Organization Name <span className="text-rose-500">*</span>
+              </label>
               <input
                 type="text"
-                value={formData.shiftEnd}
-                onChange={(e) => setFormData({ ...formData, shiftEnd: e.target.value })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 font-mono text-slate-800"
-                placeholder="17:30"
+                value={formData.companyName}
+                onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                required
+                className="w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-300 bg-slate-50/70 focus:bg-white focus:border-indigo-500 outline-none font-semibold text-slate-800 transition-all"
+                placeholder="e.g. Macha Enterprise Solutions"
               />
-              <p className="text-[11px] text-slate-400 mt-1">Punch out before this flags Early Exit</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Overtime Hourly Payout Rate (₹ / Hour)
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="10"
+                value={formData.otHourlyRate ?? 150}
+                onChange={(e) => setFormData({ ...formData, otHourlyRate: parseFloat(e.target.value) || 0 })}
+                className="w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-300 bg-slate-50/70 focus:bg-white focus:border-indigo-500 outline-none font-mono font-bold text-purple-700 transition-all"
+                placeholder="150"
+              />
             </div>
           </div>
         </div>
 
-        {/* Multi-Shift Rules (KG, K1, K2, K3, K6) */}
-        <div className="border-t border-slate-100 pt-5 space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-            <div className="flex items-center space-x-2 text-slate-800 font-bold text-sm">
-              <Sliders className="w-4 h-4 text-indigo-600" />
-              <span>Multi-Shift Timing Rules (KG, K1, K2, K3, K6)</span>
+        {/* CARD 2: Multi-Shift Policy Engine (KG, K1, K2, K3, K6) */}
+        <div className="bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-6 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div className="flex items-center space-x-3">
+              <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                <Sliders className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-base">Multi-Shift Timing Rules</h3>
+                <p className="text-xs text-slate-400">Shift codes in biometric Excel are automatically matched against these timings</p>
+              </div>
             </div>
-            <span className="text-[11px] text-indigo-600 font-semibold bg-indigo-50 px-2 py-0.5 rounded-full">
-              Excel Shift code base panni In/Out automatic-ah verify aagum
+            <span className="self-start sm:self-auto px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+              {shifts.length} Shifts Configured
             </span>
           </div>
 
+          {/* Responsive Shift Configuration Table */}
           <div className="overflow-x-auto border border-slate-200 rounded-2xl">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-500 uppercase font-semibold">
+              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold text-[11px] tracking-wider">
                 <tr>
-                  <th className="py-2.5 px-3">Code</th>
-                  <th className="py-2.5 px-3">Shift Name</th>
-                  <th className="py-2.5 px-3">Start (In)</th>
-                  <th className="py-2.5 px-3">End (Out)</th>
-                  <th className="py-2.5 px-3">Grace</th>
-                  <th className="py-2.5 px-3 text-center">Overnight?</th>
+                  <th className="py-3 px-3.5">Shift Code</th>
+                  <th className="py-3 px-3.5">Shift Name</th>
+                  <th className="py-3 px-3">Punch In</th>
+                  <th className="py-3 px-3">Punch Out</th>
+                  <th className="py-3 px-3">Grace</th>
+                  <th className="py-3 px-3 text-center">Overnight?</th>
+                  <th className="py-3 px-3 text-right">Window</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {shifts.map((s, idx) => (
-                  <tr key={s.shiftCode} className="hover:bg-slate-50">
-                    <td className="py-2.5 px-3 font-mono font-bold text-slate-800">
-                      <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  <tr key={s.shiftCode} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="py-3 px-3.5 font-mono font-bold text-slate-800">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
                         {s.shiftCode}
                       </span>
                     </td>
-                    <td className="py-2.5 px-3">
+                    <td className="py-3 px-3.5">
                       <input
                         type="text"
                         value={s.shiftName}
                         onChange={(e) => handleUpdateShift(idx, 'shiftName', e.target.value)}
-                        className="w-full px-2 py-1 rounded-lg border border-slate-200 text-slate-800 font-medium"
+                        className="w-full min-w-[140px] px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-800 font-semibold focus:border-indigo-500 outline-none"
                       />
                     </td>
-                    <td className="py-2.5 px-3">
+                    <td className="py-3 px-3">
                       <input
                         type="text"
                         value={s.shiftStart}
                         onChange={(e) => handleUpdateShift(idx, 'shiftStart', e.target.value)}
-                        className="w-20 px-2 py-1 rounded-lg border border-slate-200 font-mono font-bold text-slate-800"
+                        className="w-20 px-2.5 py-1.5 rounded-lg border border-slate-200 font-mono font-bold text-slate-800 text-center focus:border-indigo-500 outline-none"
+                        placeholder="08:30"
                       />
                     </td>
-                    <td className="py-2.5 px-3">
+                    <td className="py-3 px-3">
                       <input
                         type="text"
                         value={s.shiftEnd}
                         onChange={(e) => handleUpdateShift(idx, 'shiftEnd', e.target.value)}
-                        className="w-20 px-2 py-1 rounded-lg border border-slate-200 font-mono font-bold text-slate-800"
+                        className="w-20 px-2.5 py-1.5 rounded-lg border border-slate-200 font-mono font-bold text-slate-800 text-center focus:border-indigo-500 outline-none"
+                        placeholder="17:30"
                       />
                     </td>
-                    <td className="py-2.5 px-3">
-                      <input
-                        type="number"
-                        value={s.graceMinutes}
-                        onChange={(e) => handleUpdateShift(idx, 'graceMinutes', parseInt(e.target.value, 10) || 0)}
-                        className="w-16 px-2 py-1 rounded-lg border border-slate-200 font-mono text-slate-800"
-                      />
+                    <td className="py-3 px-3">
+                      <div className="flex items-center space-x-1">
+                        <input
+                          type="number"
+                          value={s.graceMinutes}
+                          onChange={(e) => handleUpdateShift(idx, 'graceMinutes', parseInt(e.target.value, 10) || 0)}
+                          className="w-16 px-2.5 py-1.5 rounded-lg border border-slate-200 font-mono font-bold text-slate-800 text-center focus:border-indigo-500 outline-none"
+                        />
+                        <span className="text-[11px] text-slate-400">min</span>
+                      </div>
                     </td>
-                    <td className="py-2.5 px-3 text-center">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(s.isOvernight)}
-                        onChange={(e) => handleUpdateShift(idx, 'isOvernight', e.target.checked)}
-                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer"
-                      />
+                    <td className="py-3 px-3 text-center">
+                      <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(s.isOvernight)}
+                          onChange={(e) => handleUpdateShift(idx, 'isOvernight', e.target.checked)}
+                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer"
+                        />
+                        {s.isOvernight && <Moon className="w-3.5 h-3.5 text-indigo-500" />}
+                      </label>
+                    </td>
+                    <td className="py-3 px-3 text-right font-mono text-[11px] font-semibold text-slate-500">
+                      {s.shiftStart} → {s.shiftEnd}
                     </td>
                   </tr>
                 ))}
@@ -223,131 +294,250 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           </div>
         </div>
 
-        {/* Attendance Thresholds */}
-        <div className="border-t border-slate-100 pt-5">
-          <div className="flex items-center space-x-2 text-slate-800 font-bold text-sm mb-3">
-            <Sliders className="w-4 h-4 text-indigo-600" />
-            <span>Work Duration Thresholds (Hours)</span>
+        {/* CARD 3: Work Duration & Overtime Calculation Thresholds */}
+        <div className="bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-6 shadow-xs space-y-4">
+          <div className="flex items-center space-x-3 border-b border-slate-100 pb-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-900 text-base">Attendance & Overtime Qualification Thresholds</h3>
+              <p className="text-xs text-slate-400">Rules applied to determine Full Day, Half Day, and Overtime integer hours</p>
+            </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Full Day Minimum (hrs)</label>
-              <input
-                type="number"
-                step="0.5"
-                min="1"
-                max="16"
-                value={formData.fullDayHours}
-                onChange={(e) => setFormData({ ...formData, fullDayHours: parseFloat(e.target.value) || 8 })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 font-mono text-slate-800"
-              />
-              <p className="text-[11px] text-slate-400 mt-1">Present status requires &gt;= this</p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+            {/* Threshold 1: Full Day */}
+            <div className="p-4 rounded-2xl bg-emerald-50/40 border border-emerald-100 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-emerald-800 uppercase tracking-wider text-[11px]">Full Day Present (PP)</span>
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="number"
+                  step="0.5"
+                  min="1"
+                  max="16"
+                  value={formData.fullDayHours}
+                  onChange={(e) => setFormData({ ...formData, fullDayHours: parseFloat(e.target.value) || 8 })}
+                  className="w-24 px-3 py-2 rounded-xl border border-emerald-300 bg-white font-mono font-extrabold text-slate-900 text-sm focus:border-emerald-500 outline-none"
+                />
+                <span className="font-bold text-slate-600">Hours</span>
+              </div>
+              <p className="text-[11px] text-slate-500">Minimum work duration required for 1.0 day credit</p>
             </div>
 
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Half Day Minimum (hrs)</label>
-              <input
-                type="number"
-                step="0.5"
-                min="1"
-                max="12"
-                value={formData.halfDayHours}
-                onChange={(e) => setFormData({ ...formData, halfDayHours: parseFloat(e.target.value) || 4 })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 font-mono text-slate-800"
-              />
-              <p className="text-[11px] text-slate-400 mt-1">Below this is marked Absent</p>
+            {/* Threshold 2: Half Day */}
+            <div className="p-4 rounded-2xl bg-amber-50/40 border border-amber-100 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-amber-800 uppercase tracking-wider text-[11px]">Half Day (PA/AP)</span>
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="number"
+                  step="0.5"
+                  min="1"
+                  max="12"
+                  value={formData.halfDayHours}
+                  onChange={(e) => setFormData({ ...formData, halfDayHours: parseFloat(e.target.value) || 4 })}
+                  className="w-24 px-3 py-2 rounded-xl border border-amber-300 bg-white font-mono font-extrabold text-slate-900 text-sm focus:border-amber-500 outline-none"
+                />
+                <span className="font-bold text-slate-600">Hours</span>
+              </div>
+              <p className="text-[11px] text-slate-500">Less than this is automatically marked Absent (AA)</p>
             </div>
 
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Late Grace Window (mins)</label>
-              <input
-                type="number"
-                step="5"
-                min="0"
-                max="60"
-                value={formData.graceMinutes}
-                onChange={(e) => setFormData({ ...formData, graceMinutes: parseInt(e.target.value, 10) || 0 })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 font-mono text-slate-800"
-              />
-              <p className="text-[11px] text-slate-400 mt-1">Allowed delay past shift start</p>
+            {/* Threshold 3: Late Grace Window */}
+            <div className="p-4 rounded-2xl bg-blue-50/40 border border-blue-100 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-blue-800 uppercase tracking-wider text-[11px]">Late Grace Window</span>
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="number"
+                  step="5"
+                  min="0"
+                  max="60"
+                  value={formData.graceMinutes}
+                  onChange={(e) => setFormData({ ...formData, graceMinutes: parseInt(e.target.value, 10) || 0 })}
+                  className="w-24 px-3 py-2 rounded-xl border border-blue-300 bg-white font-mono font-extrabold text-slate-900 text-sm focus:border-blue-500 outline-none"
+                />
+                <span className="font-bold text-slate-600">Mins</span>
+              </div>
+              <p className="text-[11px] text-slate-500">Late Come is calculated past Shift Start + Grace</p>
+            </div>
+
+            {/* Threshold 4: Min OT Qualification */}
+            <div className="p-4 rounded-2xl bg-purple-50/40 border border-purple-100 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-purple-800 uppercase tracking-wider text-[11px]">Min. OT Qualification</span>
+                <span className="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  max="8"
+                  value={formData.minOtQualifyHours ?? 2.0}
+                  onChange={(e) => setFormData({ ...formData, minOtQualifyHours: parseFloat(e.target.value) || 2.0 })}
+                  className="w-24 px-3 py-2 rounded-xl border border-purple-300 bg-white font-mono font-extrabold text-purple-800 text-sm focus:border-purple-500 outline-none"
+                />
+                <span className="font-bold text-purple-900">Hours</span>
+              </div>
+              <p className="text-[11px] text-slate-500">Must log &gt;= 2.0h extra to qualify for OT column</p>
             </div>
           </div>
         </div>
 
-        {/* Overtime Policies */}
-        <div className="border-t border-slate-100 pt-5">
-          <div className="flex items-center space-x-2 text-slate-800 font-bold text-sm mb-3">
-            <ShieldCheck className="w-4 h-4 text-purple-600" />
-            <span>Overtime (OT) Policy & Qualification</span>
+        {/* CARD 4: 🧪 LIVE RULE SIMULATOR & TEST SANDBOX */}
+        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-5 sm:p-6 text-white shadow-md border border-indigo-900/40 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-indigo-900/60 pb-3">
+            <div className="flex items-center space-x-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-400/20 text-amber-300 flex items-center justify-center border border-amber-400/30">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-white text-base">Live Calculation Sandbox & Rule Simulator</h3>
+                <p className="text-xs text-indigo-200">Test any punch in/out to instantly preview the exact calculated output</p>
+              </div>
+            </div>
+            <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-amber-400/10 text-amber-300 border border-amber-400/20">
+              Instant Simulation
+            </span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">OT Shift Threshold (hrs)</label>
-              <input
-                type="number"
-                step="0.5"
-                min="1"
-                max="16"
-                value={formData.otThresholdHours}
-                onChange={(e) => setFormData({ ...formData, otThresholdHours: parseFloat(e.target.value) || 8 })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 font-mono text-slate-800"
-              />
-              <p className="text-[11px] text-slate-400 mt-1">Working time exceeding this is considered extra</p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+            {/* Input Controls */}
+            <div className="space-y-3 bg-slate-800/60 p-4 rounded-2xl border border-slate-700/60">
+              <span className="font-bold text-slate-300 uppercase tracking-wider text-[11px]">1. Test Punch Inputs</span>
+
+              <div>
+                <label className="block text-slate-400 mb-1">Select Shift</label>
+                <select
+                  value={simShift}
+                  onChange={(e) => setSimShift(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-bold outline-none"
+                >
+                  {shifts.map(s => (
+                    <option key={s.shiftCode} value={s.shiftCode}>{s.shiftCode} — {s.shiftName}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-slate-400 mb-1">In Time</label>
+                  <input
+                    type="text"
+                    value={simInTime}
+                    onChange={(e) => setSimInTime(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono font-bold outline-none text-center"
+                    placeholder="08:35"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 mb-1">Out Time</label>
+                  <input
+                    type="text"
+                    value={simOutTime}
+                    onChange={(e) => setSimOutTime(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono font-bold outline-none text-center"
+                    placeholder="19:45"
+                  />
+                </div>
+              </div>
             </div>
 
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">
-                Min. OT Qualifying Duration (hrs)
-              </label>
-              <input
-                type="number"
-                step="0.5"
-                min="0"
-                max="8"
-                value={formData.minOtQualifyHours ?? 2.0}
-                onChange={(e) => setFormData({ ...formData, minOtQualifyHours: parseFloat(e.target.value) || 2.0 })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 font-mono text-slate-800 font-bold"
-              />
-              <p className="text-[11px] text-slate-400 mt-1">Must complete at least 2 full hours for OT (strictly tracked in hours)</p>
+            {/* Calculated Output Preview */}
+            <div className="md:col-span-2 bg-slate-800/60 p-4 rounded-2xl border border-slate-700/60 space-y-3">
+              <span className="font-bold text-slate-300 uppercase tracking-wider text-[11px]">2. Calculated Excel & Table Output</span>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-700 text-center">
+                  <div className="text-[10px] text-slate-400 font-bold uppercase">Muster Code</div>
+                  <div className="text-xl font-extrabold text-emerald-400 font-mono mt-0.5">{simResult.muster || 'PP'}</div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-700 text-center">
+                  <div className="text-[10px] text-slate-400 font-bold uppercase">Working Time</div>
+                  <div className="text-xl font-extrabold text-white font-mono mt-0.5">{simResult.worktime || '-'}</div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-700 text-center">
+                  <div className="text-[10px] text-slate-400 font-bold uppercase">Overtime (ht)</div>
+                  <div className="text-xl font-extrabold text-purple-400 font-mono mt-0.5">{simResult.overtimeHours || 0} hrs</div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-700 text-center">
+                  <div className="text-[10px] text-slate-400 font-bold uppercase">Day Total</div>
+                  <div className="text-xl font-extrabold text-amber-400 font-mono mt-0.5">{simResult.dayTotal || 1} d</div>
+                </div>
+              </div>
+
+              <div className="text-[11px] text-slate-300 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between font-mono">
+                <span>Extra Time: <strong className="text-indigo-300">{simResult.extraTime || '00:00'}</strong></span>
+                <span>Late Come: <strong className="text-amber-300">{simResult.lateCome || '-'}</strong></span>
+                <span>Early Go: <strong className="text-rose-300">{simResult.earlyGo || '-'}</strong></span>
+                <span>Late Go: <strong className="text-blue-300">{simResult.lateGo || '-'}</strong></span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Save button */}
-        <div className="pt-2 flex justify-end">
+        {/* Bottom Save Action Bar */}
+        <div className="flex items-center justify-between bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+          <div className="text-xs text-slate-500">
+            Clicking Save will update policies in MySQL and trigger immediate automatic recalculation.
+          </div>
+
           <button
             type="submit"
-            className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm flex items-center space-x-2 shadow-md shadow-indigo-600/30 transition-all cursor-pointer"
+            className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm flex items-center space-x-2 shadow-md shadow-indigo-600/30 transition-all cursor-pointer active:scale-98"
           >
-            <Sparkles className="w-4 h-4" />
+            <Sparkles className="w-4 h-4 text-amber-300" />
             <span>Save & Recalculate All Records</span>
           </button>
         </div>
       </form>
 
-      {/* Database Connection & Maintenance Section */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-        <div className="flex items-center space-x-2 text-slate-800 font-bold text-sm">
-          <Database className="w-4 h-4 text-emerald-600" />
-          <span>Active Database Connection</span>
+      {/* CARD 5: Database Connection & Maintenance */}
+      <div className="bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-6 shadow-xs space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center space-x-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <Database className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-900 text-base">Database Engine Status</h3>
+              <p className="text-xs text-slate-400">Persistence layer for biometric logs, policies, and company holidays</p>
+            </div>
+          </div>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>MySQL 3306 Active</span>
+          </span>
         </div>
 
-        <div className="p-4 bg-slate-50 rounded-xl grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+        <div className="p-4 bg-slate-50 rounded-2xl grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
           <div>
-            <span className="text-slate-400 font-semibold block text-[10px] uppercase">Database Engine</span>
-            <span className="font-bold text-slate-800">XAMPP MySQL (MariaDB)</span>
+            <span className="text-slate-400 font-bold block text-[10px] uppercase">Engine</span>
+            <span className="font-bold text-slate-800 text-sm">XAMPP MySQL (MariaDB)</span>
           </div>
           <div>
-            <span className="text-slate-400 font-semibold block text-[10px] uppercase">Host & Port</span>
-            <span className="font-mono font-bold text-slate-800">localhost:3306</span>
+            <span className="text-slate-400 font-bold block text-[10px] uppercase">Host & Port</span>
+            <span className="font-mono font-bold text-slate-800 text-sm">localhost:3306</span>
           </div>
           <div>
-            <span className="text-slate-400 font-semibold block text-[10px] uppercase">Database Name</span>
-            <span className="font-mono font-bold text-emerald-600">punchpulse_hr</span>
+            <span className="text-slate-400 font-bold block text-[10px] uppercase">Database Name</span>
+            <span className="font-mono font-bold text-emerald-600 text-sm">punchpulse_hr</span>
           </div>
         </div>
 
-        {/* Danger Zone: Clear Attendance Logs */}
+        {/* Danger Zone: Wipe Attendance Logs */}
         <div className="border-t border-slate-100 pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h4 className="text-xs font-bold text-rose-700">Clear Attendance Database Records</h4>
@@ -359,7 +549,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           <button
             type="button"
             onClick={() => setShowClearConfirm(true)}
-            className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-bold transition-all cursor-pointer shrink-0 self-start sm:self-auto"
+            className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-bold transition-all cursor-pointer shrink-0 self-start sm:self-auto"
           >
             <Trash2 className="w-4 h-4" />
             <span>Wipe All Logs</span>
@@ -370,7 +560,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       {/* Confirmation Modal */}
       {showClearConfirm && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 border border-slate-200 text-center">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 border border-slate-200 text-center animate-in zoom-in-95 duration-150">
             <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 mx-auto flex items-center justify-center">
               <AlertTriangle className="w-6 h-6" />
             </div>
@@ -402,4 +592,3 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     </div>
   );
 };
-
