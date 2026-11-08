@@ -139,3 +139,4 @@ export const SkeletonBanner: React.FC = () => {
     </div>
   );
 };
+
