@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Production builds
+dist/
+*.tsbuildinfo
+
+# Environment variables & Secrets
+.env
+.env.*
+!.env.example
+*.local
+
+# Databases & SQLite
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+attendance.db
+
+# Logs
+logs/
+*.log
+
+# Temp & Uploads
+uploads/
+temp/
+tmp/
+*.xlsx
+*.xls
+*.csv
+test_*.js
+sync_*.js
+resync_*.js
+verify_*.js

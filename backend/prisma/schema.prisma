@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Employee {
+  id               String           @id @default(cuid())
+  empId            String           @unique
+  name             String
+  department       String           @default("General")
+  attendanceLogs   AttendanceLog[]
+  payrollSummaries PayrollSummary[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+}
+
+model AttendanceLog {
+  id           String   @id @default(cuid())
+  empId        String
+  employee     Employee @relation(fields: [empId], references: [empId], onDelete: Cascade)
+  date         String
+  inTime       String
+  outTime      String
+  totalMinutes Int
+  totalHours   Float
+  status       String   // PRESENT, HALF_DAY, ABSENT, MISSED_PUNCH
+  isLate       Boolean  @default(false)
+  isEarlyExit  Boolean  @default(false)
+  otMinutes    Int      @default(0)
+  otHours      Float    @default(0.0)
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([empId, date])
+}
+
+model ShiftPolicy {
+  id               String   @id @default(cuid())
+  companyName      String   @default("Macha Enterprise Solutions")
+  shiftStart       String   @default("09:00")
+  shiftEnd         String   @default("18:00")
+  fullDayHours     Float    @default(8.0)
+  halfDayHours     Float    @default(4.0)
+  otThresholdHours Float    @default(8.0)
+  graceMinutes     Int      @default(15)
+  otHourlyRate     Int      @default(150)
+  isDefault        Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model PayrollSummary {
+  id             String   @id @default(cuid())
+  empId          String
+  employee       Employee @relation(fields: [empId], references: [empId], onDelete: Cascade)
+  month          String   // e.g. "2026-11"
+  year           Int
+  totalDays      Int
+  presentDays    Int
+  halfDays       Int
+  absentDays     Int
+  missedPunches  Int
+  netPayableDays Float
+  totalWorkHours Float
+  totalOtHours   Float
+  estimatedOtPay Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([empId, month, year])
+}
+

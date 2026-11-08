@@ -1,0 +1,92 @@
+# ==============================================================================
+# Dependencies
+# ==============================================================================
+node_modules/
+*/node_modules/
+.pnp
+.pnp.js
+
+# ==============================================================================
+# Production Builds & Compiled Artifacts
+# ==============================================================================
+dist/
+*/dist/
+dist-ssr/
+*/dist-ssr/
+build/
+*/build/
+out/
+*/out/
+*.tsbuildinfo
+.rollup.cache/
+
+# ==============================================================================
+# Environment Variables & Secrets (Keep credentials secure!)
+# ==============================================================================
+.env
+.env.*
+!.env.example
+*.env.local
+*.env.development.local
+*.env.test.local
+*.env.production.local
+backend/.env
+frontend/.env
+
+# ==============================================================================
+# Database & SQLite Local Storage
+# ==============================================================================
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+attendance.db
+backend/attendance.db
+dev.db
+
+# ==============================================================================
+# Logs & Process Monitoring
+# ==============================================================================
+logs/
+*/logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ==============================================================================
+# Temporary Files, Test Sheets & Biometric Data
+# ==============================================================================
+temp/
+tmp/
+uploads/
+*/uploads/
+*.xlsx
+*.xls
+*.csv
+test_*.xlsx
+test_*.csv
+test_*.js
+sync_*.js
+resync_*.js
+verify_*.js
+
+# ==============================================================================
+# Editor, IDE & Operating System Files
+# ==============================================================================
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.bak
