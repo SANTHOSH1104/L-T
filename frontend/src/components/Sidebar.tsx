@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { ShiftConfig } from '../types/attendance';
 
-export type TabType = 'overview' | 'upload' | 'logs' | 'payroll' | 'overtime' | 'holidays' | 'settings';
+export type TabType = 'overview' | 'upload' | 'logs' | 'payroll' | 'overtime' | 'holidays' | 'settings' | 'reports';
 
 interface SidebarProps {
   currentTab: TabType;
@@ -25,7 +25,6 @@ interface SidebarProps {
   totalRecordsCount: number;
   isOpenMobile?: boolean;
   onCloseMobile?: () => void;
-  onOpenExportReports?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -35,7 +34,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   totalRecordsCount,
   isOpenMobile = false,
   onCloseMobile = () => {},
-  onOpenExportReports,
 }) => {
   const menuItems: { id: TabType; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'overview', label: 'Overview', icon: <LayoutDashboard className="w-4 h-4" /> },
@@ -50,6 +48,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'overtime', label: 'OT Analytics', icon: <ClockAlert className="w-4 h-4" /> },
     { id: 'holidays', label: 'Company Leave', icon: <CalendarDays className="w-4 h-4" /> },
     { id: 'settings', label: 'Shift & Rules', icon: <Settings className="w-4 h-4" /> },
+    { id: 'reports', label: 'Reports & Export', icon: <Download className="w-4 h-4" />, badge: 'XLSX' },
   ];
 
   const handleItemClick = (id: TabType) => {
@@ -144,31 +143,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           );
         })}
 
-        {/* Dedicated Export & Reports Menu Item */}
-        {onOpenExportReports && (
-          <div className="pt-3">
-            <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              Reports & Downloads
-            </div>
-            <button
-              onClick={() => {
-                onOpenExportReports();
-                onCloseMobile();
-              }}
-              className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all group cursor-pointer text-indigo-300 hover:text-white bg-indigo-950/60 hover:bg-indigo-900/80 border border-indigo-700/50 shadow-xs"
-            >
-              <div className="flex items-center space-x-3">
-                <span className="p-1 rounded-lg text-amber-300 bg-indigo-800/80 group-hover:scale-105 transition-transform">
-                  <Download className="w-4 h-4" />
-                </span>
-                <span>Export & Reports</span>
-              </div>
-              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30">
-                XLSX
-              </span>
-            </button>
-          </div>
-        )}
       </nav>
 
       {/* Footer Info & Engine Status */}

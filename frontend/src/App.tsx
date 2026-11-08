@@ -9,7 +9,7 @@ import { PayrollTimesheetTab } from './components/PayrollTimesheetTab';
 import { OvertimeAnalyticsTab } from './components/OvertimeAnalyticsTab';
 import { SettingsTab } from './components/SettingsTab';
 import { CompanyLeaveTab } from './components/CompanyLeaveTab';
-import { ExportReportsModal } from './components/ExportReportsModal';
+import { ReportsTab } from './components/ReportsTab';
 import { SkeletonBanner, SkeletonCardGrid, SkeletonTable } from './components/common/Skeleton';
 import { AttendanceRecord, ShiftConfig, EmployeeSummary } from './types/attendance';
 import { AdminUser } from './types/auth';
@@ -31,7 +31,6 @@ export function App() {
 
   const [currentTab, setCurrentTab] = useState<TabType>('overview');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
-  const [isExportReportsOpen, setIsExportReportsOpen] = useState<boolean>(false);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [summaries, setSummaries] = useState<EmployeeSummary[]>([]);
   const [config, setConfig] = useState<ShiftConfig>(DEFAULT_SHIFT_CONFIG);
@@ -115,7 +114,6 @@ export function App() {
         totalRecordsCount={records.length}
         isOpenMobile={isMobileMenuOpen}
         onCloseMobile={() => setIsMobileMenuOpen(false)}
-        onOpenExportReports={() => setIsExportReportsOpen(true)}
       />
 
       {/* Right Main Column: Fixed full height, independent content scroll */}
@@ -125,7 +123,7 @@ export function App() {
           admin={adminUser}
           onLogout={handleLogout}
           onOpenUpload={() => setCurrentTab('upload')}
-          onOpenExportReports={() => setIsExportReportsOpen(true)}
+          onOpenExportReports={() => setCurrentTab('reports')}
           onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         />
 
@@ -202,20 +200,19 @@ export function App() {
                   onRefreshData={loadBackendData}
                 />
               )}
+
+              {currentTab === 'reports' && (
+                <ReportsTab
+                  records={records}
+                  summaries={summaries}
+                  config={config}
+                />
+              )}
             </>
           )}
         </main>
         </div>
       </div>
-
-      {/* Enterprise Multi-Filter Export & Reports Modal */}
-      <ExportReportsModal
-        isOpen={isExportReportsOpen}
-        onClose={() => setIsExportReportsOpen(false)}
-        records={records}
-        summaries={summaries}
-        config={config}
-      />
     </div>
   );
 }
