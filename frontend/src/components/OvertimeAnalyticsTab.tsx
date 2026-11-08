@@ -652,7 +652,7 @@ export const OvertimeAnalyticsTab: React.FC<OvertimeAnalyticsTabProps> = ({
                       <td className="py-3 px-3 text-center font-mono text-slate-700">
                         {emp.totalOtDuties && emp.totalOtDuties > 0 ? (
                           <span className="font-bold text-indigo-700">
-                            {emp.totalOtDuties.toFixed(1)} days
+                            {Number(emp.totalOtDuties.toFixed(3))} days
                           </span>
                         ) : (
                           <span className="text-slate-300">-</span>

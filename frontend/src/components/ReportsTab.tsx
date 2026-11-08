@@ -841,7 +841,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                       <td className="py-3 px-3 text-center font-mono text-slate-700">
                         {emp.totalOtDuties && emp.totalOtDuties > 0 ? (
                           <span className="font-bold text-indigo-700">
-                            {emp.totalOtDuties.toFixed(1)}d
+                            {Number(emp.totalOtDuties.toFixed(3))}d
                           </span>
                         ) : (
                           <span className="text-slate-300">-</span>
@@ -850,7 +850,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
 
                       {/* Net Payable Days */}
                       <td className="py-3 px-4 text-right font-mono font-black text-sm text-emerald-800">
-                        {emp.netPayableDays.toFixed(1)} Days
+                        {Number(emp.netPayableDays.toFixed(3))} Days
                       </td>
                     </tr>
                   );

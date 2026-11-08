@@ -199,7 +199,7 @@ export const PayrollTimesheetTab: React.FC<PayrollTimesheetTabProps> = ({
                       <td className="py-3 px-2 text-center font-mono font-medium text-indigo-700">{s.totalSundays || 0}</td>
                       <td className="py-3 px-2 text-center font-mono font-medium text-teal-700">{s.totalHolidays || 0}</td>
                       <td className="py-3 px-3 text-center font-mono font-bold text-emerald-800 bg-emerald-50/30">
-                        {s.netPayableDays.toFixed(1)}
+                        {Number(s.netPayableDays.toFixed(3))}
                       </td>
                       <td className="py-3 px-2 text-center font-mono text-slate-600">{formatHours(s.totalWorkHours)}</td>
                       <td className="py-3 px-2 text-center font-mono font-bold text-purple-700 bg-purple-50/30">

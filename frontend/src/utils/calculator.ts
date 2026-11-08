@@ -329,32 +329,16 @@ export function processAttendanceRecord(
     }
   }
 
-  // 2-Hour Minimum Overtime Rule: "OT complete 2hr erukanum apo tha OT consider"
-  const minOtQualifyMin = (config.minOtQualifyHours ?? 2.0) * 60; // 120 minutes
-  let otMinutes = 0;
-  let otHours = 0;
-
-  const extraMin = parseTimeToMinutes(extraData?.extraTime);
-  const explicitOtMin = parseTimeToMinutes(extraData?.overtime);
-  const effectiveExtraMin = extraMin !== null ? extraMin : Math.max(0, workedMinutes - (config.otThresholdHours * 60));
-
-  if (effectiveExtraMin >= minOtQualifyMin) {
-    if (explicitOtMin !== null && explicitOtMin > 0) {
-      otMinutes = explicitOtMin;
-    } else {
-      otMinutes = effectiveExtraMin;
-    }
-    otHours = Number((otMinutes / 60).toFixed(2));
-  } else {
-    otMinutes = 0;
-    otHours = 0;
-  }
-
   // 1. Extra Time Duration (how much duration extra time worked: HH:MM)
   let extraDurationMinutes = 0;
   const providedExtraMin = parseTimeToMinutes(extraData?.extraTime);
   if (providedExtraMin !== null && providedExtraMin > 0) {
     extraDurationMinutes = providedExtraMin;
+  } else if (extraData?.overtime) {
+    const expMin = parseTimeToMinutes(extraData.overtime);
+    if (expMin !== null && expMin > 0) {
+      extraDurationMinutes = expMin;
+    }
   } else {
     const standardShiftMin = fullDayHours * 60;
     if (workedMinutes > standardShiftMin) {
@@ -363,34 +347,35 @@ export function processAttendanceRecord(
   }
   const formattedExtraTime = extraDurationMinutes > 0 ? formatMinutesToTime(extraDurationMinutes) : '';
 
-  // 1b. Overtime Integer Hours: "1.20 extra tiime erdha 1 .... 3.45 ha erdha 3 nu cound pani kami mama"
-  let overtimeHours = Math.floor(extraDurationMinutes / 60);
-  if (extraData?.overtime) {
-    const explicitOtVal = Number(extraData.overtime);
-    if (!isNaN(explicitOtVal) && explicitOtVal > 0) {
-      overtimeHours = Math.floor(explicitOtVal);
-    } else {
-      const expMin = parseTimeToMinutes(extraData.overtime);
-      if (expMin !== null && expMin > 0) {
-        overtimeHours = Math.floor(expMin / 60);
-      }
-    }
+  // 2. Overtime Hours (OT) with Strict 1:56 Cutoff & 4-minute grace:
+  // User Rule: "then OT 1:55 erdha 0 tha varanum then 1:56 erdha 2 ..... So OT la 1hr vara kudathu mama"
+  // - If extra time <= 1:55 (115 mins) -> 0 OT!
+  // - If extra time >= 1:56 (116 mins) -> 2 hours OT! (No 1hr OT allowed).
+  // - Each subsequent hour also qualifies 4 minutes before the full hour (e.g. 2:56 -> 3h, 3:56 -> 4h, 4:56 -> 5h).
+  let overtimeHours = 0;
+
+  if (extraData?.overtime && !isNaN(Number(extraData.overtime)) && Number(extraData.overtime) > 0) {
+    const explicitVal = Math.floor(Number(extraData.overtime));
+    // If explicit number is >= 2, accept it; if < 2, it's 0 (no 1 hr OT)
+    overtimeHours = explicitVal >= 2 ? explicitVal : 0;
+  } else if (extraDurationMinutes >= 116) {
+    // 116 minutes = 1 hr 56 min. (116 + 4) / 60 = 2 hours!
+    overtimeHours = Math.floor((extraDurationMinutes + 4) / 60);
+  } else {
+    // Extra time < 1:56 (<= 115 minutes) -> 0 OT
+    overtimeHours = 0;
   }
 
-  // 1c. OT Present Unit (0.25, 0.5, 0.75, 1.0): "then OT present show panu mama half 0.5 , full 1 or 0.75 edhu pola show panu mama"
-  // Minimum 2-hour qualify rule: If < 2 hrs, OT Present is 0
-  // Every 2 hours of OT = 0.25 duty unit (2h => 0.25, 4h => 0.5, 6h => 0.75, 8h+ => 1.0)
+  const otMinutes = overtimeHours * 60;
+  const otHours = overtimeHours;
+
+  // 3. OT Duty Resolution: "like ot time divide by 8 ... ipo 5 erdha div by 8 pana 0.625 nu varanum mama"
+  // User Rule: "8 hr mela pona 1 tha max 1 tha varanum"
+  // - Formula: overtimeHours / 8, capped at maximum 1.0 duty per day.
+  // - E.g. 2h => 0.25, 3h => 0.375, 4h => 0.5, 5h => 0.625, 6h => 0.75, 7h => 0.875, 8h+ => 1.0
   let otDuty = 0;
-  if (overtimeHours >= (config.minOtQualifyHours ?? 2.0)) {
-    if (overtimeHours >= 8) {
-      otDuty = 1.0;
-    } else if (overtimeHours >= 6) {
-      otDuty = 0.75;
-    } else if (overtimeHours >= 4) {
-      otDuty = 0.5;
-    } else if (overtimeHours >= 2) {
-      otDuty = 0.25;
-    }
+  if (overtimeHours >= 2) {
+    otDuty = Number(Math.min(1.0, overtimeHours / 8).toFixed(3));
   }
 
   // 2. Late Come Duration (how much duration employee arrived late: HH:MM)
@@ -480,8 +465,8 @@ export function processAttendanceRecord(
   }
 
   // 3. Total = On Duty + OT Present + Sunday + Holiday
-  // Rule: On Duty (1) + OT (0.5) => Total 1.5! On Duty (1) + OT (1) => Total 2!
-  const dayTotal = Number((onDuty + otDuty + sundayDuty + holidayDuty).toFixed(2));
+  // Rule: On Duty (1) + OT (0.625) => Total 1.625! On Duty (1) + OT (1) => Total 2!
+  const dayTotal = Number((onDuty + otDuty + sundayDuty + holidayDuty).toFixed(3));
 
   let notes = '';
   if (isConfiguredHoliday || musterUpper === 'HP' || musterUpper === 'HL') {
@@ -568,8 +553,8 @@ export function generateEmployeeSummaries(
     const summary = map.get(r.empId)!;
     summary.totalDays += 1;
     summary.totalOnDuty = Number(((summary.totalOnDuty || 0) + (r.onDuty !== undefined ? r.onDuty : (r.status === 'PRESENT' ? 1 : r.status === 'HALF_DAY' ? 0.5 : 0))).toFixed(1));
-    const otDutyUnit = r.otDuty !== undefined ? r.otDuty : ((r.otHours >= (config.minOtQualifyHours ?? 2.0)) ? 1 : 0);
-    summary.totalOtDuties = Number(((summary.totalOtDuties || 0) + otDutyUnit).toFixed(2));
+    const otDutyUnit = r.otDuty !== undefined ? r.otDuty : ((r.otHours >= (config.minOtQualifyHours ?? 2.0)) ? Math.min(1.0, Number((r.otHours / 8).toFixed(3))) : 0);
+    summary.totalOtDuties = Number(((summary.totalOtDuties || 0) + otDutyUnit).toFixed(3));
     summary.totalSundays = (summary.totalSundays || 0) + (r.sunday || 0);
     summary.totalHolidays = (summary.totalHolidays || 0) + (r.holiday || 0);
 
@@ -597,7 +582,7 @@ export function generateEmployeeSummaries(
     summary.totalWorkHours = Number((Number(summary.totalWorkHours) + Number(r.totalHours || 0)).toFixed(2));
     summary.totalOtHours = Number((Number(summary.totalOtHours) + Number(r.otHours || 0)).toFixed(2));
     // Net Payable Days = On Duty Days + OT Duties + Sundays + Holidays - Late Penalties
-    summary.netPayableDays = Math.max(0, Number(((summary.totalOnDuty || summary.presentDays) + (summary.totalOtDuties || 0) + (summary.totalSundays || 0) + (summary.totalHolidays || 0) - summary.latePenaltyDays).toFixed(1)));
+    summary.netPayableDays = Math.max(0, Number(((summary.totalOnDuty || summary.presentDays) + (summary.totalOtDuties || 0) + (summary.totalSundays || 0) + (summary.totalHolidays || 0) - summary.latePenaltyDays).toFixed(3)));
     summary.estimatedOtPay = Math.round(summary.totalOtHours * (config.otHourlyRate || 0));
   }
 
