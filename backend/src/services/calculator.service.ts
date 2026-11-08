@@ -323,58 +323,91 @@ export function calculateRecord(
   const formattedLateCome = lateComeDurationMinutes > 0 ? formatMinutesToTime(lateComeDurationMinutes) : '';
   const isLate = lateComeDurationMinutes > graceMinutes;
 
-  // 2. Early Go Duration (how much duration employee left before shift end: HH:MM)
+  // 2. Early Go & Late Go Duration
   let earlyGoDurationMinutes = 0;
-  if (outMinutes !== null && outMinutes < shiftEndMin && status !== 'ABSENT') {
-    earlyGoDurationMinutes = shiftEndMin - outMinutes;
+  let lateGoDurationMinutes = 0;
+
+  if (inMinutes !== null && outMinutes !== null) {
+    if (shiftRule.isOvernight) {
+      // OVERNIGHT SHIFT LOGIC (e.g. K6 18:00 to 06:00, K3 23:00 to 07:30)
+      if (outMinutes >= shiftStartMin) {
+        // Employee left on the SAME NIGHT before midnight (Day 0) - this is an early exit, NOT a late go!
+        lateGoDurationMinutes = 0;
+        if (status !== 'ABSENT') {
+          earlyGoDurationMinutes = (24 * 60 - outMinutes) + shiftEndMin;
+        }
+      } else {
+        // Employee left on the NEXT MORNING after midnight (Day 1)
+        if (outMinutes > shiftEndMin) {
+          lateGoDurationMinutes = outMinutes - shiftEndMin;
+        } else if (outMinutes < shiftEndMin && status !== 'ABSENT') {
+          earlyGoDurationMinutes = shiftEndMin - outMinutes;
+        }
+      }
+    } else {
+      // REGULAR DAY SHIFT LOGIC (e.g. KG 08:30 to 17:00, K1 06:00 to 14:00)
+      if (outMinutes < inMinutes) {
+        // Stayed past midnight into next day
+        const outNormalized = outMinutes + 24 * 60;
+        if (outNormalized > shiftEndMin) {
+          lateGoDurationMinutes = outNormalized - shiftEndMin;
+        }
+      } else {
+        if (outMinutes > shiftEndMin) {
+          lateGoDurationMinutes = outMinutes - shiftEndMin;
+        } else if (outMinutes < shiftEndMin && status !== 'ABSENT') {
+          earlyGoDurationMinutes = shiftEndMin - outMinutes;
+        }
+      }
+    }
   }
+
   const formattedEarlyGo = earlyGoDurationMinutes > 0 ? formatMinutesToTime(earlyGoDurationMinutes) : '';
   const isEarlyExit = earlyGoDurationMinutes > 0;
-
-  // 3. Late Go Duration (how much duration employee stayed after shift end: HH:MM)
-  let lateGoDurationMinutes = 0;
-  if (outMinutes !== null && outMinutes > shiftEndMin) {
-    lateGoDurationMinutes = outMinutes - shiftEndMin;
-  }
   const formattedLateGo = lateGoDurationMinutes > 0 ? formatMinutesToTime(lateGoDurationMinutes) : '';
 
-  // 4. Extra Time Duration (how much duration extra time worked: HH:MM)
+  // 3. Extra Time Duration & Overtime:
   // Mathematical Rule verified against ground-truth HR standard:
   // - Early Comer (inMinutes <= shiftStartMin): (shiftStartMin - inMinutes) + LateGo
   // - Late Comer (inMinutes > shiftStartMin): LateGo (late minutes are recorded in LateCome, NOT deducted from overtime past shift end)
+  // - Sunday Rule: "Sunday work time OT la add aaguthu" -> Sunday work time is credited to Sunday duty, NOT OT!
+  // - User Rule: "9hr mela extra time erdha overtime la 8 tha varanum" -> Overtime is capped at maximum 8 hours!
   let extraDurationMinutes = 0;
-  if (inMinutes !== null && outMinutes !== null) {
-    if (inMinutes <= shiftStartMin) {
-      extraDurationMinutes = (shiftStartMin - inMinutes) + lateGoDurationMinutes;
+  let overtimeHours = 0;
+  let otDuty = 0;
+
+  if (!isDateSunday && inMinutes !== null && outMinutes !== null && status !== 'ABSENT') {
+    if (shiftRule.isOvernight && outMinutes >= shiftStartMin) {
+      // Overnight shift: left early on same night -> no extra time!
+      extraDurationMinutes = 0;
     } else {
-      extraDurationMinutes = lateGoDurationMinutes;
+      if (inMinutes <= shiftStartMin) {
+        extraDurationMinutes = (shiftStartMin - inMinutes) + lateGoDurationMinutes;
+      } else {
+        extraDurationMinutes = lateGoDurationMinutes;
+      }
+    }
+
+    // Overtime Hours (OT) with Strict 1:56 Cutoff & 4-minute grace & 8-hour maximum cap:
+    // - If extra time <= 1:55 (115 mins) -> 0 OT!
+    // - If extra time >= 1:56 (116 mins) -> Math.min(8, Math.floor((extraDurationMinutes + 4) / 60))
+    // - User Rule: "9hr mela extra time erdha overtime la 8 tha varanum"
+    if (extraDurationMinutes >= 116) {
+      overtimeHours = Math.min(8, Math.floor((extraDurationMinutes + 4) / 60));
+    } else {
+      overtimeHours = 0;
+    }
+
+    // OT Duty Resolution: "like ot time divide by 8 ... ipo 5 erdha div by 8 pana 0.625 nu varanum mama"
+    // - Formula: overtimeHours / 8, capped at maximum 1.0 duty per day.
+    if (overtimeHours >= 2) {
+      otDuty = Number(Math.min(1.0, overtimeHours / 8).toFixed(3));
     }
   }
+
   const formattedExtraTime = extraDurationMinutes > 0 ? formatMinutesToTime(extraDurationMinutes) : '';
-
-  // 5. Overtime Hours (OT) with Strict 1:56 Cutoff & 4-minute grace:
-  // User Rule: "then OT 1:55 erdha 0 tha varanum then 1:56 erdha 2 ..... So OT la 1hr vara kudathu mama"
-  // - If extra time <= 1:55 (115 mins) -> 0 OT!
-  // - If extra time >= 1:56 (116 mins) -> 2 hours OT! (No 1hr OT allowed).
-  // - Each subsequent hour also qualifies 4 minutes before the full hour (e.g. 2:56 -> 3h, 3:56 -> 4h, 4:56 -> 5h).
-  let overtimeHours = 0;
-  if (extraDurationMinutes >= 116) {
-    overtimeHours = Math.floor((extraDurationMinutes + 4) / 60);
-  } else {
-    overtimeHours = 0;
-  }
-
   const otMinutes = overtimeHours * 60;
   const otHours = overtimeHours;
-
-  // 6. OT Duty Resolution: "like ot time divide by 8 ... ipo 5 erdha div by 8 pana 0.625 nu varanum mama"
-  // User Rule: "8 hr mela pona 1 tha max 1 tha varanum"
-  // - Formula: overtimeHours / 8, capped at maximum 1.0 duty per day.
-  // - E.g. 2h => 0.25, 3h => 0.375, 4h => 0.5, 5h => 0.625, 6h => 0.75, 7h => 0.875, 8h+ => 1.0
-  let otDuty = 0;
-  if (overtimeHours >= 2) {
-    otDuty = Number(Math.min(1.0, overtimeHours / 8).toFixed(3));
-  }
 
   // 7. Worktime Duration formatting:
   // In standard HR practice, Worktime displays the standard shift duration for full day present
