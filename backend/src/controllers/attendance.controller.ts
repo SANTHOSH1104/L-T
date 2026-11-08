@@ -32,6 +32,15 @@ export async function getActiveConfig(): Promise<ShiftConfig> {
       }))
     : DEFAULT_SHIFTS;
 
+  const holidayRows = await getAllRows<any>('SELECT * FROM company_holidays ORDER BY date ASC');
+  const holidays = holidayRows.map(h => ({
+    id: h.id,
+    date: h.date,
+    name: h.name,
+    type: h.type,
+    isPaid: Boolean(Number(h.isPaid))
+  }));
+
   if (row) {
     return {
       companyName: row.companyName,
@@ -44,9 +53,10 @@ export async function getActiveConfig(): Promise<ShiftConfig> {
       otHourlyRate: Number(row.otHourlyRate) || 150,
       minOtQualifyHours: 2.0,
       shifts,
+      holidays,
     };
   }
-  return { ...DEFAULT_SHIFT_CONFIG, shifts };
+  return { ...DEFAULT_SHIFT_CONFIG, shifts, holidays };
 }
 
 // 1. GET ALL ATTENDANCE LOGS FROM REAL DATABASE

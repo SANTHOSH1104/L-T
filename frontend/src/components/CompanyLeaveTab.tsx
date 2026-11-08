@@ -9,7 +9,9 @@ import {
   Calendar,
   Gift,
   Building,
-  AlertCircle
+  AlertCircle,
+  Clock,
+  Check
 } from 'lucide-react';
 import { CompanyHoliday, ShiftConfig } from '../types/attendance';
 import { 
@@ -18,7 +20,7 @@ import {
   deleteCompanyHoliday, 
   syncCompanyHolidays 
 } from '../services/api';
-import { Button, Input, Modal } from './common';
+import { Button } from './common';
 
 interface CompanyLeaveTabProps {
   config: ShiftConfig;
@@ -42,10 +44,9 @@ export const CompanyLeaveTab: React.FC<CompanyLeaveTabProps> = ({ config, onRefr
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
-  const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [bannerMessage, setBannerMessage] = useState<string | null>(null);
 
-  // Form State
+  // Form State for NEW Custom Holiday Creation
   const [holidayDate, setHolidayDate] = useState<string>('');
   const [holidayName, setHolidayName] = useState<string>('');
   const [holidayType, setHolidayType] = useState<'PUBLIC_HOLIDAY' | 'FESTIVAL' | 'COMPANY_OFF' | 'OPTIONAL'>('PUBLIC_HOLIDAY');
@@ -67,20 +68,23 @@ export const CompanyLeaveTab: React.FC<CompanyLeaveTabProps> = ({ config, onRefr
     loadHolidays();
   }, []);
 
-  const handleAddHoliday = async (e: React.FormEvent) => {
+  const handleCreateNewHoliday = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!holidayDate || !holidayName.trim()) return;
+    if (!holidayDate || !holidayName.trim()) {
+      alert('Please enter both Holiday Date and Holiday Name!');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
       await createCompanyHoliday({
-        date: holidayDate,
+        date: holidayDate.trim(),
         name: holidayName.trim(),
         type: holidayType,
         isPaid,
       });
-      setBannerMessage(`Holiday '${holidayName.trim()}' added on ${holidayDate} and synced to attendance logs!`);
-      setShowAddModal(false);
+
+      setBannerMessage(`✅ New Holiday '${holidayName.trim()}' successfully created for ${holidayDate}! Attendance logs & Excel exports updated.`);
       setHolidayDate('');
       setHolidayName('');
       await loadHolidays();
@@ -96,7 +100,7 @@ export const CompanyLeaveTab: React.FC<CompanyLeaveTabProps> = ({ config, onRefr
     setIsSubmitting(true);
     try {
       await createCompanyHoliday(preset);
-      setBannerMessage(`Added preset holiday: ${preset.name} (${preset.date})`);
+      setBannerMessage(`✅ Added holiday: ${preset.name} (${preset.date}) and applied to logs!`);
       await loadHolidays();
       if (onRefreshData) onRefreshData();
     } catch (err: any) {
@@ -111,7 +115,7 @@ export const CompanyLeaveTab: React.FC<CompanyLeaveTabProps> = ({ config, onRefr
 
     try {
       await deleteCompanyHoliday(id);
-      setBannerMessage(`Deleted holiday '${name}' and reverted attendance.`);
+      setBannerMessage(`Deleted holiday '${name}' and reverted attendance status.`);
       await loadHolidays();
       if (onRefreshData) onRefreshData();
     } catch (err: any) {
@@ -123,7 +127,7 @@ export const CompanyLeaveTab: React.FC<CompanyLeaveTabProps> = ({ config, onRefr
     setIsSyncing(true);
     try {
       await syncCompanyHolidays();
-      setBannerMessage(`All ${holidays.length} company holidays successfully synchronized to attendance logs & Excel sheets!`);
+      setBannerMessage(`✅ All ${holidays.length} company holidays successfully synchronized to attendance logs & Excel export!`);
       if (onRefreshData) onRefreshData();
     } catch (err: any) {
       alert(err.message || 'Failed to sync holidays');
@@ -156,9 +160,9 @@ export const CompanyLeaveTab: React.FC<CompanyLeaveTabProps> = ({ config, onRefr
             <CalendarDays className="w-4 h-4" />
             <span>Company Leave & Holiday Calendar</span>
           </div>
-          <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Company Holidays & Leaves</h2>
+          <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Company Leave & Holiday Management</h2>
           <p className="text-slate-500 text-sm mt-0.5">
-            Dates added here automatically show as <span className="font-semibold text-teal-700">Holiday (HL)</span> in Excel exports, mark payable holiday credit (<span className="font-mono text-emerald-600 font-bold">1.0</span>), and update employee status.
+            Any date added here automatically shows as <span className="font-semibold text-teal-700">Holiday (HL)</span> with payable credit (<span className="font-mono text-emerald-600 font-bold">1.0</span>) in attendance logs, and gets considered immediately during Excel uploads!
           </p>
         </div>
 
@@ -171,15 +175,6 @@ export const CompanyLeaveTab: React.FC<CompanyLeaveTabProps> = ({ config, onRefr
           >
             <RefreshCw className={`w-4 h-4 text-slate-600 ${isSyncing ? 'animate-spin' : ''}`} />
             <span>{isSyncing ? 'Syncing...' : 'Sync to Attendance'}</span>
-          </Button>
-
-          <Button
-            variant="primary"
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center space-x-2 shadow-sm bg-indigo-600 hover:bg-indigo-700 text-white"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Company Leave</span>
           </Button>
         </div>
       </div>
@@ -200,7 +195,101 @@ export const CompanyLeaveTab: React.FC<CompanyLeaveTabProps> = ({ config, onRefr
         </div>
       )}
 
-      {/* 3. Quick Stats Cards */}
+      {/* 3. 🔥 DIRECT INLINE CREATION FORM: CREATE ANY CUSTOM NEW HOLIDAY */}
+      <div className="bg-white rounded-2xl border-2 border-indigo-200 p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold">
+              <Plus className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-900 text-base">Create New Custom Company Leave / Holiday</h3>
+              <p className="text-xs text-slate-500">
+                Type any date and custom holiday name to add it directly to the system.
+              </p>
+            </div>
+          </div>
+          <span className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+            Instant Excel Sync
+          </span>
+        </div>
+
+        <form onSubmit={handleCreateNewHoliday} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+          {/* Field 1: Date Picker */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              1. Holiday Date <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="date"
+              value={holidayDate}
+              onChange={(e) => setHolidayDate(e.target.value)}
+              required
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+            />
+          </div>
+
+          {/* Field 2: Holiday Name */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              2. Holiday Name / Reason <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. Diwali, Annual Day, Rain Holiday"
+              value={holidayName}
+              onChange={(e) => setHolidayName(e.target.value)}
+              required
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+            />
+          </div>
+
+          {/* Field 3: Category */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              3. Category
+            </label>
+            <select
+              value={holidayType}
+              onChange={(e) => setHolidayType(e.target.value as any)}
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+            >
+              <option value="PUBLIC_HOLIDAY">Public Holiday (National / State)</option>
+              <option value="FESTIVAL">Festival (Diwali, Pongal, Christmas)</option>
+              <option value="COMPANY_OFF">Company Declared Off</option>
+              <option value="OPTIONAL">Optional / Restricted Leave</option>
+            </select>
+          </div>
+
+          {/* Field 4: Submit Button */}
+          <div className="space-y-2">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full h-[42px] px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-md shadow-indigo-600/20 hover:shadow-lg transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
+            >
+              <Plus className="w-4 h-4 stroke-[3]" />
+              <span>{isSubmitting ? 'Creating...' : 'Create & Apply Holiday'}</span>
+            </button>
+          </div>
+
+          {/* Paid Leave Checkbox Full Row */}
+          <div className="sm:col-span-2 lg:col-span-4 flex items-center space-x-2 pt-1">
+            <input
+              type="checkbox"
+              id="isPaid"
+              checked={isPaid}
+              onChange={(e) => setIsPaid(e.target.checked)}
+              className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+            />
+            <label htmlFor="isPaid" className="text-xs font-medium text-slate-700 cursor-pointer select-none">
+              Mark as <span className="font-bold text-emerald-700">Paid Holiday</span> — All employees receive <span className="font-bold text-indigo-700">1.0 Day</span> payable credit on this date.
+            </label>
+          </div>
+        </form>
+      </div>
+
+      {/* 4. Quick Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs flex items-center space-x-4">
           <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
@@ -208,7 +297,7 @@ export const CompanyLeaveTab: React.FC<CompanyLeaveTabProps> = ({ config, onRefr
           </div>
           <div>
             <div className="text-2xl font-bold text-slate-800">{holidays.length}</div>
-            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Holidays</div>
+            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">Configured Holidays</div>
           </div>
         </div>
 
@@ -237,12 +326,15 @@ export const CompanyLeaveTab: React.FC<CompanyLeaveTabProps> = ({ config, onRefr
         </div>
       </div>
 
-      {/* 4. Common Presets Bar */}
-      <div className="bg-gradient-to-r from-indigo-50 via-slate-50 to-amber-50 rounded-2xl border border-indigo-100/80 p-5">
-        <div className="flex items-center space-x-2 text-indigo-900 font-bold text-xs uppercase tracking-wider mb-2">
-          <Sparkles className="w-4 h-4 text-indigo-600" />
-          <span>Quick Preset Suggestions (Click to Add Instantly)</span>
+      {/* 5. Quick 1-Click Common Presets Bar */}
+      <div className="bg-gradient-to-r from-slate-50 via-indigo-50/40 to-slate-50 rounded-2xl border border-slate-200 p-5">
+        <div className="flex items-center space-x-2 text-slate-700 font-bold text-xs uppercase tracking-wider mb-2">
+          <Sparkles className="w-4 h-4 text-amber-500" />
+          <span>⚡ Quick 1-Click Common Presets (Optional Shortcuts)</span>
         </div>
+        <p className="text-xs text-slate-400 mb-3">
+          Click any preset button below to quickly add it to your calendar, or use the form above to add custom dates.
+        </p>
         <div className="flex flex-wrap gap-2">
           {COMMON_PRESET_HOLIDAYS.map((preset) => {
             const isAlreadyAdded = holidays.some(h => h.date === preset.date);
@@ -253,24 +345,24 @@ export const CompanyLeaveTab: React.FC<CompanyLeaveTabProps> = ({ config, onRefr
                 disabled={isAlreadyAdded || isSubmitting}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all flex items-center space-x-1.5 ${
                   isAlreadyAdded
-                    ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                    : 'bg-white text-slate-700 border-slate-200 hover:border-indigo-300 hover:text-indigo-600 hover:shadow-xs shadow-2xs'
+                    ? 'bg-emerald-50/60 text-emerald-700 border-emerald-200 cursor-default'
+                    : 'bg-white text-slate-700 border-slate-200 hover:border-indigo-400 hover:text-indigo-600 hover:shadow-xs shadow-2xs'
                 }`}
                 title={isAlreadyAdded ? 'Already added to calendar' : `Add ${preset.name} on ${preset.date}`}
               >
                 <span>{preset.name}</span>
                 <span className="font-mono text-[11px] text-slate-400">({preset.date.slice(5)})</span>
-                {isAlreadyAdded && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 ml-1" />}
+                {isAlreadyAdded && <Check className="w-3.5 h-3.5 text-emerald-600 ml-1 stroke-[3]" />}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* 5. Holidays Grid & List View */}
+      {/* 6. Holidays List View */}
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
         <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-          <h3 className="font-bold text-slate-800 text-sm">Scheduled Company Leave Dates</h3>
+          <h3 className="font-bold text-slate-800 text-sm">Scheduled Company Leave Calendar</h3>
           <span className="text-xs text-slate-500 font-mono font-medium">{holidays.length} Dates Configured</span>
         </div>
 
@@ -284,7 +376,7 @@ export const CompanyLeaveTab: React.FC<CompanyLeaveTabProps> = ({ config, onRefr
             <AlertCircle className="w-8 h-8 text-slate-300 mx-auto" />
             <p className="text-sm font-semibold text-slate-700">No company leaves configured yet.</p>
             <p className="text-xs text-slate-400 max-w-sm mx-auto">
-              Click 'Add Company Leave' or pick from the preset suggestions above to schedule company holidays.
+              Use the form above to add custom company leaves, or click from the quick presets.
             </p>
           </div>
         ) : (
@@ -320,11 +412,11 @@ export const CompanyLeaveTab: React.FC<CompanyLeaveTabProps> = ({ config, onRefr
                         )}
                       </div>
                       <div className="text-xs text-slate-500 mt-1 flex items-center space-x-3 font-mono">
-                        <span>{h.date}</span>
+                        <span className="font-bold text-slate-700">{h.date}</span>
                         <span>•</span>
                         <span>{dInfo.weekday}</span>
                         <span>•</span>
-                        <span className="text-slate-400">Excel Status: Muster 'HL' | Holiday: 1.0</span>
+                        <span className="text-teal-700 font-medium">Excel: Muster 'HL' | Holiday: 1.0 | Total: 1.0</span>
                       </div>
                     </div>
                   </div>
@@ -345,89 +437,6 @@ export const CompanyLeaveTab: React.FC<CompanyLeaveTabProps> = ({ config, onRefr
           </div>
         )}
       </div>
-
-      {/* 6. Add Company Holiday Modal */}
-      <Modal
-        isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        title="Add Company Leave / Holiday"
-      >
-        <form onSubmit={handleAddHoliday} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-              Holiday Date (YYYY-MM-DD)
-            </label>
-            <input
-              type="date"
-              value={holidayDate}
-              onChange={(e) => setHolidayDate(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-              Holiday Name / Reason
-            </label>
-            <Input
-              type="text"
-              placeholder="e.g. Gandhi Jayanti, Diwali, Annual Day"
-              value={holidayName}
-              onChange={(e) => setHolidayName(e.target.value)}
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-              Holiday Category
-            </label>
-            <select
-              value={holidayType}
-              onChange={(e) => setHolidayType(e.target.value as any)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-            >
-              <option value="PUBLIC_HOLIDAY">Public Holiday (National / State)</option>
-              <option value="FESTIVAL">Festival (Diwali, Pongal, Eid, Christmas)</option>
-              <option value="COMPANY_OFF">Company Declared Off</option>
-              <option value="OPTIONAL">Optional / Restricted Leave</option>
-            </select>
-          </div>
-
-          <div className="flex items-center space-x-2 pt-2">
-            <input
-              type="checkbox"
-              id="isPaid"
-              checked={isPaid}
-              onChange={(e) => setIsPaid(e.target.checked)}
-              className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
-            />
-            <label htmlFor="isPaid" className="text-xs font-medium text-slate-700 cursor-pointer">
-              Mark as Paid Holiday (Employees receive <span className="font-bold text-emerald-600">1.0 Day</span> payable credit)
-            </label>
-          </div>
-
-          <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setShowAddModal(false)}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={isSubmitting}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white"
-            >
-              {isSubmitting ? 'Saving...' : 'Add to Calendar'}
-            </Button>
-          </div>
-        </form>
-      </Modal>
     </div>
   );
 };

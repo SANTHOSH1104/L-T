@@ -23,6 +23,7 @@ export interface ShiftConfig {
   lateGraceCount?: number;     // e.g. 3 late arrivals = 1 half-day cut
   weekendOtMultiplier?: number; // e.g. 1.5x or 2.0x for Sundays
   shifts?: ShiftDefinition[];   // Multi-shift rules: KG, K1, K2, K3, K6
+  holidays?: CompanyHoliday[];  // Configured company leaves & holidays
 }
 
 export type AttendanceStatus = 'PRESENT' | 'HALF_DAY' | 'ABSENT' | 'MISSED_PUNCH' | 'HOLIDAY' | 'WEEKLY_OFF';

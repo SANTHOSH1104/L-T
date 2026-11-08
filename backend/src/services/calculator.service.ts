@@ -190,16 +190,20 @@ export function calculateRecord(
   const graceMinutes = shiftRule.graceMinutes !== undefined ? shiftRule.graceMinutes : (config.graceMinutes || 15);
 
   const isDateSunday = isSundayDate(date);
+  const companyHoliday = config.holidays?.find(h => h.date === date);
+  const isConfiguredHoliday = Boolean(companyHoliday);
 
   // Both punches missing
   if (inMinutes === null && outMinutes === null) {
-    const isHoliday = rawMuster === 'HP' || rawMuster === 'HL' || rawMuster === 'PH';
+    const isHolidayMuster = rawMuster === 'HP' || rawMuster === 'HL' || rawMuster === 'PH';
+    const isHoliday = isConfiguredHoliday || isHolidayMuster;
     const isExplicitWeekOff = rawMuster === 'WO' || rawMuster === 'WW' || rawMuster === 'SUN';
     const isWeekOff = isDateSunday || isExplicitWeekOff;
     const isOnDuty = rawMuster === 'OD';
-    const status: AttendanceStatus = isHoliday || isOnDuty ? 'PRESENT' : 'ABSENT';
-    const musterCode = isHoliday ? (rawMuster || 'HP') : isWeekOff ? 'WW' : (rawMuster || 'AA');
-    const dayTotal = isHoliday || isOnDuty ? 1 : 0;
+    const holidayPaid = isHoliday && (companyHoliday ? companyHoliday.isPaid !== false : true);
+    const status: AttendanceStatus = isHoliday ? 'HOLIDAY' : isOnDuty ? 'PRESENT' : 'ABSENT';
+    const musterCode = isHoliday ? 'HL' : isWeekOff ? 'WW' : (rawMuster || 'AA');
+    const dayTotal = isHoliday ? (holidayPaid ? 1 : 0) : isOnDuty ? 1 : 0;
 
     return {
       id,
@@ -213,12 +217,14 @@ export function calculateRecord(
       muster: musterCode,
       worktime: extraData?.worktime || '',
       extraTime: extraData?.extraTime || '',
+      overtimeHours: 0,
       lateCome: extraData?.lateCome || '',
       earlyGo: extraData?.earlyGo || '',
       lateGo: extraData?.lateGo || '',
+      otDuty: 0,
       onDuty: isOnDuty ? 1 : 0,
       sunday: 0,
-      holiday: isHoliday ? 1 : 0,
+      holiday: holidayPaid ? 1 : 0,
       dayTotal,
       totalMinutes: 0,
       totalHours: 0,
@@ -227,7 +233,7 @@ export function calculateRecord(
       isEarlyExit: false,
       otMinutes: 0,
       otHours: 0,
-      notes: isHoliday ? 'Holiday' : isWeekOff ? 'Weekly Off (WW)' : isOnDuty ? 'On Duty' : 'Absent (No Punch)',
+      notes: isHoliday ? (companyHoliday ? `${companyHoliday.name} (Holiday)` : 'Holiday') : isWeekOff ? 'Weekly Off (WW)' : isOnDuty ? 'On Duty' : 'Absent (No Punch)',
     };
   }
 
@@ -419,9 +425,17 @@ export function calculateRecord(
 
   let onDuty = 0;
   let sundayDuty = 0;
-  const isHoliday = (musterUpper === 'HP' || musterUpper === 'HL' || musterUpper === 'PH') ? 1 : 0;
+  let holidayDuty = 0;
 
-  if (isDateSunday) {
+  if (isConfiguredHoliday || musterUpper === 'HP' || musterUpper === 'HL' || musterUpper === 'PH') {
+    // COMPANY HOLIDAY WORK RULE:
+    // Employee worked on a company holiday
+    muster = 'HP';
+    status = 'PRESENT';
+    holidayDuty = (companyHoliday ? companyHoliday.isPaid !== false : true) ? 1.0 : 0.0;
+    onDuty = 0;
+    sundayDuty = 0;
+  } else if (isDateSunday) {
     // SUNDAY RULE:
     // "Na kudukura date la sunday erdha muster la ww podu.... suppose sunday work pana sundat column la varanum mama"
     muster = 'WW';
@@ -437,10 +451,12 @@ export function calculateRecord(
     }
     // For Sunday work, duty is credited to sunday column, onDuty is 0
     onDuty = 0;
+    holidayDuty = 0;
   } else {
     // WEEKDAY (Mon - Sat) RULE:
     // "Then on duty column la full day work pana tha varuthu ahduva half day present erdha 0.5 varanaum mama"
     sundayDuty = 0;
+    holidayDuty = 0;
     if (status === 'PRESENT' || workedHours >= fullDayHours || musterUpper === 'PP' || musterUpper === 'OD') {
       onDuty = 1;
     } else if (status === 'HALF_DAY' || workedHours >= halfDayHours || musterUpper === 'PA' || musterUpper === 'AP') {
@@ -452,10 +468,13 @@ export function calculateRecord(
 
   // 3. Total = On Duty + OT Present + Sunday + Holiday
   // Rule: On Duty (1) + OT (0.5) => Total 1.5! On Duty (1) + OT (1) => Total 2!
-  const dayTotal = Number((onDuty + otDuty + sundayDuty + isHoliday).toFixed(2));
+  const dayTotal = Number((onDuty + otDuty + sundayDuty + holidayDuty).toFixed(2));
 
   let notes = '';
-  if (isDateSunday) {
+  if (isConfiguredHoliday || musterUpper === 'HP' || musterUpper === 'HL') {
+    notes = companyHoliday ? `Worked on Holiday: ${companyHoliday.name}` : 'Worked on Holiday';
+    if (otDuty > 0) notes += ` + OT (${overtimeHours}h)`;
+  } else if (isDateSunday) {
     if (sundayDuty === 1) notes = otDuty > 0 ? `Sunday Full Duty + OT (${overtimeHours}h)` : 'Sunday Full Duty (1d)';
     else if (sundayDuty === 0.5) notes = 'Sunday Half Duty (0.5d)';
     else notes = 'Weekly Off (WW)';
@@ -485,7 +504,7 @@ export function calculateRecord(
     otDuty,
     onDuty,
     sunday: sundayDuty,
-    holiday: isHoliday,
+    holiday: holidayDuty,
     dayTotal,
     totalMinutes: workedMinutes,
     totalHours: workedHours,
