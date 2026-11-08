@@ -187,7 +187,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <input
                 type="number"
                 min="0"
-                step="10"
+                step="any"
                 value={formData.otHourlyRate ?? 150}
                 onChange={(e) => setFormData({ ...formData, otHourlyRate: parseFloat(e.target.value) || 0 })}
                 className="w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-300 bg-slate-50/70 focus:bg-white focus:border-indigo-500 outline-none font-mono font-bold text-purple-700 transition-all"
@@ -316,11 +316,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <div className="flex items-center space-x-2">
                 <input
                   type="number"
-                  step="0.5"
-                  min="1"
-                  max="16"
+                  step="any"
+                  min="0"
+                  max="24"
                   value={formData.fullDayHours}
-                  onChange={(e) => setFormData({ ...formData, fullDayHours: parseFloat(e.target.value) || 8 })}
+                  onChange={(e) => setFormData({ ...formData, fullDayHours: parseFloat(e.target.value) || 0 })}
                   className="w-24 px-3 py-2 rounded-xl border border-emerald-300 bg-white font-mono font-extrabold text-slate-900 text-sm focus:border-emerald-500 outline-none"
                 />
                 <span className="font-bold text-slate-600">Hours</span>
@@ -337,11 +337,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <div className="flex items-center space-x-2">
                 <input
                   type="number"
-                  step="0.5"
-                  min="1"
-                  max="12"
+                  step="any"
+                  min="0"
+                  max="24"
                   value={formData.halfDayHours}
-                  onChange={(e) => setFormData({ ...formData, halfDayHours: parseFloat(e.target.value) || 4 })}
+                  onChange={(e) => setFormData({ ...formData, halfDayHours: parseFloat(e.target.value) || 0 })}
                   className="w-24 px-3 py-2 rounded-xl border border-amber-300 bg-white font-mono font-extrabold text-slate-900 text-sm focus:border-amber-500 outline-none"
                 />
                 <span className="font-bold text-slate-600">Hours</span>
@@ -358,9 +358,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <div className="flex items-center space-x-2">
                 <input
                   type="number"
-                  step="5"
+                  step="any"
                   min="0"
-                  max="60"
+                  max="120"
                   value={formData.graceMinutes}
                   onChange={(e) => setFormData({ ...formData, graceMinutes: parseInt(e.target.value, 10) || 0 })}
                   className="w-24 px-3 py-2 rounded-xl border border-blue-300 bg-white font-mono font-extrabold text-slate-900 text-sm focus:border-blue-500 outline-none"
@@ -379,11 +379,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <div className="flex items-center space-x-2">
                 <input
                   type="number"
-                  step="0.5"
+                  step="any"
                   min="0"
-                  max="8"
+                  max="24"
                   value={formData.minOtQualifyHours ?? 2.0}
-                  onChange={(e) => setFormData({ ...formData, minOtQualifyHours: parseFloat(e.target.value) || 2.0 })}
+                  onChange={(e) => setFormData({ ...formData, minOtQualifyHours: parseFloat(e.target.value) || 0 })}
                   className="w-24 px-3 py-2 rounded-xl border border-purple-300 bg-white font-mono font-extrabold text-purple-800 text-sm focus:border-purple-500 outline-none"
                 />
                 <span className="font-bold text-purple-900">Hours</span>
