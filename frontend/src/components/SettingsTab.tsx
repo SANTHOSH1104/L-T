@@ -312,6 +312,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   <th className="py-3 px-3.5">Shift Name</th>
                   <th className="py-3 px-3">Punch In</th>
                   <th className="py-3 px-3">Punch Out</th>
+                  <th className="py-3 px-3">Full Day</th>
+                  <th className="py-3 px-3">Half Day</th>
                   <th className="py-3 px-3">Grace</th>
                   <th className="py-3 px-3 text-center">Overnight?</th>
                   <th className="py-3 px-3 text-right">Window</th>
@@ -348,8 +350,36 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                         value={s.shiftEnd}
                         onChange={(e) => handleUpdateShift(idx, 'shiftEnd', e.target.value)}
                         className="w-20 px-2.5 py-1.5 rounded-lg border border-slate-200 font-mono font-bold text-slate-800 text-center focus:border-indigo-500 outline-none"
-                        placeholder="17:30"
+                        placeholder="17:00"
                       />
+                    </td>
+                    <td className="py-3 px-3">
+                      <div className="flex items-center space-x-1">
+                        <input
+                          type="number"
+                          step="0.5"
+                          min="0"
+                          max="24"
+                          value={s.fullDayHours || ''}
+                          onChange={(e) => handleUpdateShift(idx, 'fullDayHours', parseFloat(e.target.value) || 0)}
+                          className="w-16 px-2 py-1.5 rounded-lg border border-slate-200 font-mono font-bold text-slate-800 text-center focus:border-indigo-500 outline-none"
+                        />
+                        <span className="text-[11px] text-slate-400">h</span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-3">
+                      <div className="flex items-center space-x-1">
+                        <input
+                          type="number"
+                          step="0.5"
+                          min="0"
+                          max="24"
+                          value={s.halfDayHours || ''}
+                          onChange={(e) => handleUpdateShift(idx, 'halfDayHours', parseFloat(e.target.value) || 0)}
+                          className="w-16 px-2 py-1.5 rounded-lg border border-slate-200 font-mono font-bold text-slate-800 text-center focus:border-indigo-500 outline-none"
+                        />
+                        <span className="text-[11px] text-slate-400">h</span>
+                      </div>
                     </td>
                     <td className="py-3 px-3">
                       <div className="flex items-center space-x-1">
