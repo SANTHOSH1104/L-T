@@ -123,6 +123,32 @@ export const getShiftPolicy = async (_req: Request, res: Response): Promise<void
   }
 };
 
+// Helper to compute shift hours from punch in and punch out
+function computeShiftHoursFromTimes(start: string, end: string, isOvernight?: boolean): number {
+  if (!start || !end) return 8;
+  const sParts = start.trim().split(':');
+  const eParts = end.trim().split(':');
+  if (sParts.length < 2 || eParts.length < 2) return 8;
+
+  const sH = parseInt(sParts[0], 10);
+  const sM = parseInt(sParts[1], 10);
+  const eH = parseInt(eParts[0], 10);
+  const eM = parseInt(eParts[1], 10);
+
+  if (isNaN(sH) || isNaN(sM) || isNaN(eH) || isNaN(eM)) return 8;
+
+  const startMin = sH * 60 + sM;
+  let endMin = eH * 60 + eM;
+
+  if (isOvernight || endMin < startMin) {
+    endMin += 1440;
+  }
+
+  const durationMin = endMin - startMin;
+  const hours = durationMin / 60;
+  return Math.round(hours * 10) / 10;
+}
+
 // 3. SAVE SHIFT CONFIG & AUTO RECALCULATE DATABASE RECORDS
 export const saveShiftPolicy = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -146,6 +172,12 @@ export const saveShiftPolicy = async (req: Request, res: Response): Promise<void
     // Save Multi-Shifts if provided
     if (cfg.shifts && Array.isArray(cfg.shifts)) {
       for (const s of cfg.shifts) {
+        // Full Day is strictly auto-calculated from Punch In & Punch Out
+        const computedFull = computeShiftHoursFromTimes(s.shiftStart, s.shiftEnd, Boolean(s.isOvernight));
+        const finalHalf = (s.halfDayHours !== undefined && s.halfDayHours !== null)
+          ? Number(s.halfDayHours)
+          : (computedFull === 8.5 ? 4.0 : Math.round((computedFull / 2) * 10) / 10);
+
         await runQuery(`
           INSERT INTO shifts (shiftCode, shiftName, shiftStart, shiftEnd, fullDayHours, halfDayHours, graceMinutes, isOvernight)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -162,8 +194,8 @@ export const saveShiftPolicy = async (req: Request, res: Response): Promise<void
           s.shiftName,
           s.shiftStart,
           s.shiftEnd,
-          s.fullDayHours || 8.0,
-          s.halfDayHours || 4.0,
+          computedFull,
+          finalHalf,
           s.graceMinutes !== undefined ? s.graceMinutes : 15,
           s.isOvernight ? 1 : 0
         ]);
