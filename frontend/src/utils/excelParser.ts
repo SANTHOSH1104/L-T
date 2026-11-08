@@ -180,16 +180,19 @@ export function transformRowsToAttendance(
  */
 export function exportAttendanceToExcel(records: AttendanceRecord[], filename = 'Attendance_Calculations.xlsx') {
   const exportData = records.map((r, i) => {
-    const overtimeHours = r.overtimeHours !== undefined ? r.overtimeHours : Math.floor((parseTimeToMinutes(r.extraTime) || 0) / 60);
+    const overtimeHours = r.overtimeHours !== undefined ? r.overtimeHours : (
+      (() => {
+        const extraMin = parseTimeToMinutes(r.extraTime) || 0;
+        return extraMin >= 116 ? Math.floor((extraMin + 4) / 60) : 0;
+      })()
+    );
     const otDuty = r.otDuty !== undefined ? r.otDuty : (
-      overtimeHours >= 2.0
-        ? (overtimeHours >= 8 ? 1.0 : overtimeHours >= 6 ? 0.75 : overtimeHours >= 4 ? 0.5 : 0.25)
-        : 0
+      overtimeHours >= 2.0 ? Number(Math.min(1.0, overtimeHours / 8).toFixed(3)) : 0
     );
     const onDuty = r.onDuty !== undefined ? r.onDuty : (r.status === 'PRESENT' ? 1 : r.status === 'HALF_DAY' ? 0.5 : 0);
     const sunday = r.sunday !== undefined ? r.sunday : 0;
     const holiday = r.holiday !== undefined ? r.holiday : 0;
-    const total = r.dayTotal !== undefined ? r.dayTotal : Number((onDuty + otDuty + sunday + holiday).toFixed(2));
+    const total = r.dayTotal !== undefined ? r.dayTotal : Number((onDuty + otDuty + sunday + holiday).toFixed(3));
 
     return {
       'S.No': i + 1,
@@ -338,16 +341,19 @@ export function exportMasterReportToExcel(
 
   if (options.includeDailyLogs && records.length > 0) {
     const dailyData = records.map((r, i) => {
-      const overtimeHours = r.overtimeHours !== undefined ? r.overtimeHours : Math.floor((parseTimeToMinutes(r.extraTime) || 0) / 60);
+      const overtimeHours = r.overtimeHours !== undefined ? r.overtimeHours : (
+        (() => {
+          const extraMin = parseTimeToMinutes(r.extraTime) || 0;
+          return extraMin >= 116 ? Math.floor((extraMin + 4) / 60) : 0;
+        })()
+      );
       const otDuty = r.otDuty !== undefined ? r.otDuty : (
-        overtimeHours >= 2.0
-          ? (overtimeHours >= 8 ? 1.0 : overtimeHours >= 6 ? 0.75 : overtimeHours >= 4 ? 0.5 : 0.25)
-          : 0
+        overtimeHours >= 2.0 ? Number(Math.min(1.0, overtimeHours / 8).toFixed(3)) : 0
       );
       const onDuty = r.onDuty !== undefined ? r.onDuty : (r.status === 'PRESENT' ? 1 : r.status === 'HALF_DAY' ? 0.5 : 0);
       const sunday = r.sunday !== undefined ? r.sunday : 0;
       const holiday = r.holiday !== undefined ? r.holiday : 0;
-      const total = r.dayTotal !== undefined ? r.dayTotal : Number((onDuty + otDuty + sunday + holiday).toFixed(2));
+      const total = r.dayTotal !== undefined ? r.dayTotal : Number((onDuty + otDuty + sunday + holiday).toFixed(3));
 
       return {
         'S.No': i + 1,

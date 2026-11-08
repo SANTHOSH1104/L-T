@@ -54,7 +54,7 @@ export interface AttendanceRecord {
   lateCome?: string;    // e.g. 00:03:00
   earlyGo?: string;     // e.g. 01:29:00
   lateGo?: string;      // e.g. 01:06:00
-  otDuty?: number;      // OT Present: 0.25, 0.5, 0.75, 1.0
+  otDuty?: number;      // OT Duty: overtimeHours / 8 (e.g. 5h => 0.625, max 1.0)
   onDuty?: number;      // 1 or 0.5 or 0
   sunday?: number;      // 1 or 0
   holiday?: number;     // 1 or 0

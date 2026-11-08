@@ -378,17 +378,22 @@ export const DailyLogsTab: React.FC<DailyLogsTabProps> = ({
                 displayedRecords.map((r) => {
                   const overtimeHours = r.overtimeHours !== undefined 
                     ? r.overtimeHours 
-                    : Math.floor((parseTimeToMinutes(r.extraTime) || 0) / 60);
+                    : (
+                      (() => {
+                        const extraMin = parseTimeToMinutes(r.extraTime) || 0;
+                        return extraMin >= 116 ? Math.floor((extraMin + 4) / 60) : 0;
+                      })()
+                    );
 
                   const otPresent = r.otDuty !== undefined ? r.otDuty : (
-                    overtimeHours >= (config.minOtQualifyHours ?? 2.0)
-                      ? (overtimeHours >= 8 ? 1.0 : overtimeHours >= 6 ? 0.75 : overtimeHours >= 4 ? 0.5 : 0.25)
+                    overtimeHours >= 2.0
+                      ? Number(Math.min(1.0, overtimeHours / 8).toFixed(3))
                       : 0
                   );
                   const onDuty = r.onDuty !== undefined ? r.onDuty : (r.status === 'PRESENT' ? 1 : r.status === 'HALF_DAY' ? 0.5 : 0);
                   const sunday = r.sunday !== undefined ? r.sunday : 0;
                   const holiday = r.holiday !== undefined ? r.holiday : 0;
-                  const dayTotal = r.dayTotal !== undefined ? r.dayTotal : Number((onDuty + otPresent + sunday + holiday).toFixed(2));
+                  const dayTotal = r.dayTotal !== undefined ? r.dayTotal : Number((onDuty + otPresent + sunday + holiday).toFixed(3));
 
                   return (
                     <tr key={r.id} className="group hover:bg-slate-50/80 transition-colors">

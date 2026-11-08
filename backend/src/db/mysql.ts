@@ -105,9 +105,9 @@ export async function initDatabase() {
     { name: 'onDuty', type: "DECIMAL(4,2) NOT NULL DEFAULT 0.00" },
     { name: 'sunday', type: "DECIMAL(4,2) NOT NULL DEFAULT 0.00" },
     { name: 'holiday', type: "DECIMAL(4,2) NOT NULL DEFAULT 0.00" },
-    { name: 'dayTotal', type: "DECIMAL(4,2) NOT NULL DEFAULT 0.00" },
+    { name: 'dayTotal', type: "DECIMAL(6,3) NOT NULL DEFAULT 0.000" },
     { name: 'overtimeHours', type: "INT NOT NULL DEFAULT 0" },
-    { name: 'otDuty', type: "DECIMAL(4,2) NOT NULL DEFAULT 0.00" },
+    { name: 'otDuty', type: "DECIMAL(6,3) NOT NULL DEFAULT 0.000" },
   ];
 
   for (const col of columnsToAdd) {
