@@ -19,6 +19,7 @@ interface NavbarProps {
   admin: AdminUser | null;
   onLogout: () => void;
   onOpenUpload: () => void;
+  onOpenExportReports?: () => void;
   onToggleMobileMenu?: () => void;
 }
 
@@ -27,6 +28,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   admin,
   onLogout,
   onOpenUpload,
+  onOpenExportReports,
   onToggleMobileMenu,
 }) => {
   return (
@@ -75,6 +77,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           <Download className="w-3.5 h-3.5 text-slate-500 shrink-0" />
           <span className="hidden sm:inline">Template</span>
         </button>
+
+        {/* Export Reports Hub Button */}
+        {onOpenExportReports && (
+          <button
+            onClick={onOpenExportReports}
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-98"
+            title="Open Enterprise Export & Reports Hub"
+          >
+            <Download className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+            <span className="hidden sm:inline">Export Reports</span>
+          </button>
+        )}
 
         {/* Upload Excel Button */}
         <button
