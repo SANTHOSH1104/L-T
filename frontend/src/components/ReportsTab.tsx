@@ -21,7 +21,8 @@ import {
   CalendarCheck,
   CalendarDays,
   X,
-  UserCheck
+  UserCheck,
+  RotateCcw
 } from 'lucide-react';
 import { AttendanceRecord, EmployeeSummary, ShiftConfig } from '../types/attendance';
 import { generateEmployeeSummaries } from '../utils/calculator';
@@ -218,6 +219,21 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
     setShowOnlySelected(false);
   };
 
+  const handleResetAll = () => {
+    setSearchQuery('');
+    setSelectedEmpIds([]);
+    setShowOnlySelected(false);
+    setSelectedDept('ALL');
+    setActiveDatePreset('FULL');
+    setStartDate(minDate);
+    setEndDate(maxDate);
+    setCurrentPage(1);
+    setSortBy('id');
+    setSortOrder('asc');
+    setReportType('MASTER');
+    setSuccessBanner(null);
+  };
+
   // Search match selection helpers
   const areAllSearchMatchesSelected = useMemo(() => {
     if (!searchQuery.trim() || filteredAndSortedEmployees.length === 0) return false;
@@ -308,43 +324,48 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
   const totalOtHoursSum = Number(targetEmployeesForExport.reduce((acc, e) => acc + e.totalOtHours, 0).toFixed(1));
 
   return (
-    <div className="w-full space-y-6">
-      {/* 1. HERO BANNER: Executive Reporting Suite */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 sm:p-7 text-white shadow-xl border border-indigo-900/40 flex flex-col md:flex-row md:items-center justify-between gap-5 relative overflow-hidden">
-        <div className="absolute right-0 top-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
-
-        <div className="space-y-2 relative z-10">
-          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-xs font-semibold">
-            <FileSpreadsheet className="w-3.5 h-3.5 text-amber-300" />
-            <span>ENTERPRISE REPORTING & EXPORT CENTER</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-            <span>Multi-Employee Selection Enabled</span>
-          </div>
-
-          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-            Custom Reports & Excel Downloads
+    <div className="w-full space-y-4">
+      {/* 1. MINIMAL SAAS PAGE HEADER */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1 border-b border-slate-200/80">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+            <FileSpreadsheet className="w-6 h-6 text-indigo-600" />
+            <span>Reports & Export</span>
+            {selectedEmpIds.length > 0 && (
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-mono font-bold border border-indigo-200">
+                {selectedEmpIds.length} Selected
+              </span>
+            )}
           </h2>
-
-          <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-            Select single, multiple (two or more), or all employees using the checkboxes below.
-            Choose any date range or fortnight — present days and overtime totals recalculate dynamically!
+          <p className="text-xs text-slate-500 mt-0.5">
+            Filter attendance by date, department, or staff and export multi-sheet logs to Excel.
           </p>
         </div>
 
-        {/* Primary Download Action in Banner */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0 relative z-10">
+        {/* Global Action Buttons */}
+        <div className="flex items-center space-x-2 shrink-0">
+          <button
+            type="button"
+            onClick={handleResetAll}
+            title="Reset all filters, dates, and selections to default"
+            className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+            <span>Reset All</span>
+          </button>
+
           <button
             onClick={handleExecuteExport}
             disabled={isExporting || totalDailyRecordsCount === 0}
-            className="px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-black text-xs sm:text-sm flex items-center justify-center space-x-2 shadow-lg shadow-emerald-600/30 transition-all cursor-pointer active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-all cursor-pointer active:scale-95 disabled:opacity-50"
           >
             <Download className="w-4 h-4" />
             <span>
               {isExporting 
-                ? 'Generating Excel...' 
+                ? 'Exporting...' 
                 : selectedEmpIds.length > 0 
-                  ? `Download Selected (${selectedEmpIds.length}) Staff (.xlsx)` 
-                  : 'Download All Records (.xlsx)'
+                  ? `Download Selected (${selectedEmpIds.length})` 
+                  : 'Download Full Report (.xlsx)'
               }
             </span>
           </button>
@@ -353,154 +374,117 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
 
       {/* Success Notification Alert */}
       {successBanner && (
-        <div className="p-4 rounded-2xl bg-emerald-50 text-emerald-900 border border-emerald-300 text-xs font-bold flex items-center space-x-3 shadow-xs animate-in fade-in duration-200">
-          <div className="w-7 h-7 rounded-lg bg-emerald-500 text-white flex items-center justify-center shrink-0">
-            <CheckCircle2 className="w-4 h-4" />
-          </div>
-          <div>
-            <div>{successBanner}</div>
-            <div className="text-[11px] text-emerald-700 font-normal">Excel file generated and ready in your browser downloads folder.</div>
-          </div>
+        <div className="p-3 rounded-2xl bg-emerald-50 text-emerald-900 border border-emerald-300 text-xs font-bold flex items-center space-x-2.5 shadow-2xs animate-in fade-in duration-200">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <div className="flex-1 truncate">{successBanner}</div>
+          <button 
+            type="button" 
+            onClick={() => setSuccessBanner(null)} 
+            className="text-emerald-700 hover:text-emerald-900 font-bold px-1"
+          >
+            ✕
+          </button>
         </div>
       )}
 
-      {/* 2. TOP 4 DYNAMIC KPI CARDS: Live Updates as Date & Person Change */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Target Workforce */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-indigo-300 transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              {selectedEmpIds.length > 0 ? 'Selected Workforce' : 'Total Workforce'}
-            </span>
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-              <Users className="w-5 h-5" />
+      {/* 2. COMPACT SUMMARY KPI STRIP */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Workforce</span>
+            <div className="text-xl font-black text-slate-900 font-mono mt-0.5">
+              {selectedEmpIds.length > 0 ? `${selectedEmpIds.length} Staff` : `${summaries.length} Staff`}
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight font-mono">
-              {totalWorkforceSelected} <span className="text-sm font-medium text-slate-500 font-sans">
-                {selectedEmpIds.length > 0 ? `Selected of ${summaries.length}` : 'Staff Total'}
-              </span>
-            </div>
-            <div className="mt-2 flex items-center space-x-1.5 text-xs text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg w-fit font-medium">
-              <Building2 className="w-3.5 h-3.5 text-indigo-600" />
-              <span>{selectedDept === 'ALL' ? 'All Departments' : selectedDept}</span>
-            </div>
+          <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <Users className="w-4 h-4" />
           </div>
         </div>
 
-        {/* Card 2: Date Span & Total Punch Rows */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Date Span & Punch Logs</span>
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-              <Calendar className="w-5 h-5" />
+        <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Date Span Logs</span>
+            <div className="text-xl font-black text-blue-700 font-mono mt-0.5">
+              {totalDailyRecordsCount.toLocaleString()} <span className="text-xs text-slate-400 font-normal">rows</span>
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl sm:text-3xl font-black text-blue-700 tracking-tight font-mono">
-              {totalDailyRecordsCount.toLocaleString()} <span className="text-sm font-medium text-slate-500 font-sans">Logs</span>
-            </div>
-            <div className="mt-2 flex items-center space-x-1.5 text-xs text-blue-800 bg-blue-50 px-2.5 py-1 rounded-lg w-fit font-medium font-mono">
-              <Clock className="w-3.5 h-3.5 text-blue-600" />
-              <span>{startDate} → {endDate}</span>
-            </div>
+          <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+            <Clock className="w-4 h-4" />
           </div>
         </div>
 
-        {/* Card 3: Net Payable Days (Dynamically Recalculated!) */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-emerald-300 transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Net Payable Days</span>
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <CalendarCheck className="w-5 h-5" />
+        <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Net Payable</span>
+            <div className="text-xl font-black text-emerald-700 font-mono mt-0.5">
+              {totalPayableDaysSum.toLocaleString()} <span className="text-xs text-slate-400 font-normal">Days</span>
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl sm:text-3xl font-black text-emerald-700 tracking-tight font-mono">
-              {totalPayableDaysSum.toLocaleString()} <span className="text-sm font-medium text-slate-500 font-sans">Days</span>
-            </div>
-            <div className="mt-2 flex items-center space-x-1.5 text-xs text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg w-fit font-medium">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Recalculated for this date slice</span>
-            </div>
+          <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <CalendarCheck className="w-4 h-4" />
           </div>
         </div>
 
-        {/* Card 4: Total Overtime Hours (Dynamically Recalculated!) */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-purple-300 transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Overtime Hours</span>
-            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-              <Clock className="w-5 h-5" />
+        <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Overtime Total</span>
+            <div className="text-xl font-black text-purple-700 font-mono mt-0.5">
+              +{totalOtHoursSum.toLocaleString()} <span className="text-xs text-slate-400 font-normal">hrs</span>
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl sm:text-3xl font-black text-purple-700 tracking-tight font-mono">
-              +{totalOtHoursSum.toLocaleString()} <span className="text-sm font-medium text-slate-500 font-sans">hrs</span>
-            </div>
-            <div className="mt-2 flex items-center space-x-1.5 text-xs text-purple-800 bg-purple-50 px-2.5 py-1 rounded-lg w-fit font-medium">
-              <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-              <span>Extra duty past shift timings</span>
-            </div>
+          <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+            <Sparkles className="w-4 h-4" />
           </div>
         </div>
       </div>
 
-      {/* 3. INTERACTIVE CONTROL CENTER: Date Range, Report Type & Employee Filters */}
-      <div className="bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-6 shadow-xs space-y-5">
-        
-        {/* ROW 1: Date Range Filters & Preset Shortcuts */}
-        <div className="space-y-2.5 border-b border-slate-100 pb-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="flex items-center space-x-2">
-              <CalendarDays className="w-4 h-4 text-indigo-600" />
-              <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">1. Select Date Range & Period</span>
+      {/* 3. STREAMLINED FILTER & SEARCH TOOLBAR */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-3.5 shadow-2xs space-y-3">
+        {/* Row 1: Date Range, Presets & Export Format */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100">
+          {/* Date Range & Presets */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex items-center space-x-1.5 text-xs font-bold text-slate-700 mr-1">
+              <CalendarDays className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Period:</span>
             </div>
 
-            {/* Quick Fortnight / Month Preset Buttons */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => applyDatePreset('FULL')}
-                className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                  activeDatePreset === 'FULL'
-                    ? 'bg-slate-900 text-white shadow-xs'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Full Month (01-31 Oct)
-              </button>
+            <button
+              type="button"
+              onClick={() => applyDatePreset('FULL')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeDatePreset === 'FULL'
+                  ? 'bg-slate-900 text-white shadow-2xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Full Month
+            </button>
+            <button
+              type="button"
+              onClick={() => applyDatePreset('H1')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeDatePreset === 'H1'
+                  ? 'bg-indigo-600 text-white shadow-2xs'
+                  : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+              }`}
+            >
+              1st - 15th
+            </button>
+            <button
+              type="button"
+              onClick={() => applyDatePreset('H2')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeDatePreset === 'H2'
+                  ? 'bg-indigo-600 text-white shadow-2xs'
+                  : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+              }`}
+            >
+              16th - 31st
+            </button>
 
-              <button
-                type="button"
-                onClick={() => applyDatePreset('H1')}
-                className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                  activeDatePreset === 'H1'
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
-                }`}
-              >
-                1st - 15th (1st Half)
-              </button>
-
-              <button
-                type="button"
-                onClick={() => applyDatePreset('H2')}
-                className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                  activeDatePreset === 'H2'
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
-                }`}
-              >
-                16th - 31st (2nd Half)
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-center">
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">From Date (Start):</label>
+            {/* Date Pickers */}
+            <div className="flex items-center space-x-1 ml-1 text-xs font-mono">
               <input
                 type="date"
                 value={startDate}
@@ -509,12 +493,9 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                   setActiveDatePreset('CUSTOM');
                   setCurrentPage(1);
                 }}
-                className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 bg-slate-50/70 focus:bg-white focus:border-indigo-500 outline-none"
+                className="px-2 py-0.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-xs font-bold outline-none"
               />
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">To Date (End):</label>
+              <span className="text-slate-400">→</span>
               <input
                 type="date"
                 value={endDate}
@@ -523,82 +504,53 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                   setActiveDatePreset('CUSTOM');
                   setCurrentPage(1);
                 }}
-                className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 bg-slate-50/70 focus:bg-white focus:border-indigo-500 outline-none"
+                className="px-2 py-0.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-xs font-bold outline-none"
               />
             </div>
+          </div>
 
-            {/* Report Type Selector */}
-            <div className="lg:col-span-2">
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Choose Export Format:</label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setReportType('MASTER')}
-                  className={`px-2.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
-                    reportType === 'MASTER'
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  📦 Master 3-in-1
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setReportType('PAYROLL')}
-                  className={`px-2.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
-                    reportType === 'PAYROLL'
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  📊 Payroll Only
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setReportType('LOGS')}
-                  className={`px-2.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
-                    reportType === 'LOGS'
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  📑 Daily Logs
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setReportType('OVERTIME')}
-                  className={`px-2.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
-                    reportType === 'OVERTIME'
-                      ? 'bg-purple-600 text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  ⏱️ OT Audit
-                </button>
-              </div>
-            </div>
+          {/* Export Format Selector */}
+          <div className="flex items-center space-x-1">
+            <span className="text-xs font-bold text-slate-500 mr-1">Format:</span>
+            {(['MASTER', 'PAYROLL', 'LOGS', 'OVERTIME'] as ReportType[]).map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setReportType(type)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  reportType === type
+                    ? 'bg-indigo-600 text-white shadow-2xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {type === 'MASTER' && '📦 Master (3-in-1)'}
+                {type === 'PAYROLL' && '📊 Payroll'}
+                {type === 'LOGS' && '📑 Logs'}
+                {type === 'OVERTIME' && '⏱️ OT'}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* ROW 2: Employee Search, Dept Filter, Multi-select Badge & Actions */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div className="flex flex-1 flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-            {/* Search */}
+        {/* Row 2: Search, Multi-Search Action, Department, and Reset Controls */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div className="flex flex-1 flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            {/* Search Input with inline clear */}
             <div className="relative flex-1 max-w-md">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
               <input
                 type="text"
-                placeholder="Search single or multiple (e.g. Siluvai, Dhanan or 101, 102)..."
+                placeholder="Search staff (comma for multi: Siluvai, Dhanan)..."
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                className="w-full pl-9 pr-8 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 outline-none transition-all"
+                className="w-full pl-8 pr-7 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 outline-none transition-all"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => { setSearchQuery(''); setCurrentPage(1); }}
-                  title="Clear search text (selected staff stay selected)"
-                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
+                  title="Clear search text"
+                  className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -610,12 +562,11 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
               <button
                 type="button"
                 onClick={handleToggleSelectSearchMatches}
-                className={`inline-flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs shrink-0 ${
+                className={`inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
                   areAllSearchMatchesSelected
-                    ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300'
-                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    ? 'bg-amber-100 text-amber-800 border border-amber-200 hover:bg-amber-200'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs'
                 }`}
-                title={areAllSearchMatchesSelected ? 'Deselect all matching employees' : 'Select all matching employees'}
               >
                 {areAllSearchMatchesSelected ? (
                   <>
@@ -632,107 +583,70 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
             )}
 
             {/* Department Filter */}
-            <div className="relative w-full sm:w-56">
-              <Filter className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-              <select
-                value={selectedDept}
-                onChange={(e) => { setSelectedDept(e.target.value); setCurrentPage(1); }}
-                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 outline-none transition-all appearance-none cursor-pointer font-medium"
-              >
-                <option value="ALL">All Departments</option>
-                {departments.map(dept => (
-                  <option key={dept} value={dept}>{dept}</option>
-                ))}
-              </select>
-            </div>
+            <select
+              value={selectedDept}
+              onChange={(e) => { setSelectedDept(e.target.value); setCurrentPage(1); }}
+              className="px-2.5 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 outline-none cursor-pointer font-medium"
+            >
+              <option value="ALL">All Departments</option>
+              {departments.map(dept => (
+                <option key={dept} value={dept}>{dept}</option>
+              ))}
+            </select>
           </div>
 
-          {/* Multi-Select status and Clear button */}
+          {/* Right: Show Selected Toggle & Reset Action */}
           <div className="flex items-center space-x-2 shrink-0">
-            {selectedEmpIds.length > 0 ? (
-              <div className="flex items-center space-x-2 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl">
-                <span className="text-xs font-bold text-indigo-900 font-mono">
-                  {selectedEmpIds.length} Staff Selected
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setShowOnlySelected(!showOnlySelected)}
-                  className={`text-[11px] font-bold px-2 py-0.5 rounded-md cursor-pointer transition-all ${
-                    showOnlySelected ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
-                  }`}
-                >
-                  {showOnlySelected ? 'Show All Table' : 'Show Selected Only'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleClearAllSelections}
-                  className="text-[11px] font-bold text-rose-600 hover:text-rose-800 underline cursor-pointer"
-                >
-                  Clear
-                </button>
-              </div>
-            ) : (
-              <span className="text-xs text-slate-500 font-medium">
-                Tip: Click row or checkbox to select multiple staff
-              </span>
+            {selectedEmpIds.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowOnlySelected(!showOnlySelected)}
+                className={`text-xs font-bold px-2.5 py-1.5 rounded-xl cursor-pointer transition-all ${
+                  showOnlySelected
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200'
+                }`}
+              >
+                {showOnlySelected ? 'Show All Table' : `Show Selected (${selectedEmpIds.length}) Only`}
+              </button>
             )}
 
-            {/* Download Button */}
+            {/* Table Search & Select Reset Button */}
             <button
-              onClick={handleExecuteExport}
-              disabled={isExporting || totalDailyRecordsCount === 0}
-              className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+              type="button"
+              onClick={handleResetAll}
+              className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer transition-all"
+              title="Reset all search, selections, and filters to default"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>Export {selectedEmpIds.length > 0 ? `Selected (${selectedEmpIds.length})` : 'All'}</span>
+              <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+              <span>Reset</span>
             </button>
           </div>
         </div>
 
-        {/* Multi-Search Helpful Guidance & Found Badge */}
-        <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-500 bg-slate-50/80 px-3 py-2 rounded-xl border border-slate-100 gap-2">
-          <div className="flex items-center space-x-2">
-            <span className="font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200 shrink-0">
-              💡 Multi-Search:
-            </span>
-            <span>
-              Type multiple names or IDs with comma (e.g. <strong className="text-indigo-900 font-mono">Siluvai, Dhanan</strong> or <strong className="text-indigo-900 font-mono">101, 102</strong>) or paste IDs from Excel!
-            </span>
-          </div>
-          {searchQuery.trim() && (
-            <div className="flex items-center space-x-1.5 text-xs font-bold text-indigo-800 bg-indigo-100/70 px-2.5 py-0.5 rounded-full border border-indigo-200 shrink-0">
-              <span>{filteredAndSortedEmployees.length} Matching Staff Found</span>
-            </div>
-          )}
-        </div>
-
-        {/* Selected Staff Tags (Visual preview when employees are selected) */}
+        {/* Selected Staff Tags (Crisp, only shown when >= 1 staff selected) */}
         {selectedEmpIds.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 p-3 rounded-2xl bg-indigo-50/80 border border-indigo-200">
-            <div className="flex items-center space-x-1.5 text-xs font-bold text-indigo-900 mr-1.5">
-              <UserCheck className="w-4 h-4 text-indigo-600" />
-              <span>Selected ({selectedEmpIds.length}):</span>
-            </div>
-            {selectedEmpIds.slice(0, 6).map(id => {
+          <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100 text-xs">
+            <span className="font-bold text-slate-600 mr-1">Selected Staff ({selectedEmpIds.length}):</span>
+            {selectedEmpIds.slice(0, 8).map(id => {
               const emp = summaries.find(s => s.empId === id);
               return (
-                <span key={id} className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-xs font-bold text-slate-800 shadow-2xs">
+                <span key={id} className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-indigo-50 border border-indigo-200 text-xs font-bold text-slate-800">
                   <span className="font-mono text-slate-400 text-[10px]">{id}</span>
                   <span>{emp?.empName || id}</span>
                   <button 
                     type="button" 
-                    onClick={(e) => { e.stopPropagation(); toggleSelectEmp(id); }} 
-                    className="text-slate-400 hover:text-rose-600 ml-1 cursor-pointer font-extrabold"
-                    title="Remove from selection"
+                    onClick={() => toggleSelectEmp(id)} 
+                    className="text-slate-400 hover:text-rose-600 ml-1 cursor-pointer font-black"
                   >
                     ×
                   </button>
                 </span>
               );
             })}
-            {selectedEmpIds.length > 6 && (
+            {selectedEmpIds.length > 8 && (
               <span className="text-xs font-bold text-indigo-700 font-mono px-2 py-0.5 rounded-md bg-indigo-100">
-                +{selectedEmpIds.length - 6} more
+                +{selectedEmpIds.length - 8} more
               </span>
             )}
             <button
@@ -740,21 +654,10 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
               onClick={handleClearAllSelections}
               className="ml-auto text-xs font-bold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer"
             >
-              Clear All ({selectedEmpIds.length})
+              Clear Selected
             </button>
           </div>
         )}
-
-        {/* Live File Preview Chip */}
-        <div className="flex items-center justify-between text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-100 font-mono">
-          <span className="flex items-center space-x-1.5 truncate">
-            <FileCheck className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-            <span>Target File: <strong className="text-slate-800">{generatedFilename}</strong></span>
-          </span>
-          <span className="text-emerald-700 font-bold shrink-0">
-            {totalDailyRecordsCount.toLocaleString()} Daily Rows • {totalPayableDaysSum} Net Days
-          </span>
-        </div>
       </div>
 
       {/* 4. LIVE INTERACTIVE DATA TABLE: Shows All Details by Default */}
@@ -820,13 +723,12 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                 <th className="py-3 px-3 text-right font-black text-purple-900">Total OT</th>
                 <th className="py-3 px-3 text-center">OT Duty</th>
                 <th className="py-3 px-4 text-right font-black text-emerald-800">Net Payable Days</th>
-                <th className="py-3 px-3 text-center">Single Export</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
               {paginatedEmployees.length === 0 ? (
                 <tr>
-                  <td colSpan={14} className="py-12 text-center text-slate-400">
+                  <td colSpan={13} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center space-y-2">
                       <Users className="w-8 h-8 text-slate-300" />
                       <p className="text-sm font-semibold text-slate-600">No employees match your search or filter</p>
@@ -949,22 +851,6 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                       {/* Net Payable Days */}
                       <td className="py-3 px-4 text-right font-mono font-black text-sm text-emerald-800">
                         {emp.netPayableDays.toFixed(1)} Days
-                      </td>
-
-                      {/* Single Person Download Action */}
-                      <td className="py-3 px-3 text-center">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleExportSingleEmployee(emp);
-                          }}
-                          title={`Download personal Excel report for ${emp.empName}`}
-                          className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-indigo-600 hover:text-white text-slate-700 text-[11px] font-bold transition-all cursor-pointer shadow-2xs"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          <span>Report</span>
-                        </button>
                       </td>
                     </tr>
                   );
