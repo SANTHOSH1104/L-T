@@ -156,7 +156,7 @@ export const PayrollTimesheetTab: React.FC<PayrollTimesheetTabProps> = ({
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold">
               <tr>
-                <th className="py-3 px-4">Employee</th>
+                <th className="py-3 px-4 sticky left-0 bg-slate-50 z-20 shadow-xs border-r border-slate-200 min-w-[170px]">Employee</th>
                 <th className="py-3 px-3">Dept</th>
                 <th className="py-3 px-2 text-center">Total</th>
                 <th className="py-3 px-2 text-center text-emerald-700">Present (1.0)</th>
@@ -185,8 +185,8 @@ export const PayrollTimesheetTab: React.FC<PayrollTimesheetTabProps> = ({
               ) : (
                 filteredAndSorted.map((s) => {
                   return (
-                    <tr key={s.empId} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-3 px-4">
+                    <tr key={s.empId} className="group hover:bg-slate-50 transition-colors">
+                      <td className="py-3 px-4 sticky left-0 bg-white group-hover:bg-slate-50 z-10 shadow-xs border-r border-slate-100 min-w-[170px]">
                         <div className="font-bold text-slate-800">{s.empName}</div>
                         <div className="text-[11px] text-slate-400 font-mono">{s.empId}</div>
                       </td>
