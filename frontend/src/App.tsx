@@ -115,6 +115,7 @@ export function App() {
         totalRecordsCount={records.length}
         isOpenMobile={isMobileMenuOpen}
         onCloseMobile={() => setIsMobileMenuOpen(false)}
+        onOpenExportReports={() => setIsExportReportsOpen(true)}
       />
 
       {/* Right Main Column: Fixed full height, independent content scroll */}
