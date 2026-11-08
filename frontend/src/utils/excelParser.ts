@@ -226,7 +226,6 @@ export function exportAttendanceToExcel(records: AttendanceRecord[], filename = 
   saveAs(blob, filename);
 }
 
-
 /**
  * Export monthly payroll summary to Excel (.xlsx)
  */
@@ -290,6 +289,119 @@ export function exportOvertimeReportToExcel(
   const worksheet = XLSX.utils.json_to_sheet(exportData);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'OT Duty Audit');
+
+  const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  saveAs(blob, filename);
+}
+
+/**
+ * Export Multi-Sheet Master Attendance & Payroll Report (.xlsx)
+ * Can generate 1, 2, or 3 sheets depending on options:
+ * - 'Payroll Summary': Employee-wise consolidated days
+ * - 'Daily Punch Logs': Day-by-day punch rows
+ * - 'OT Duty Audit': Overtime duty analysis
+ */
+export function exportMasterReportToExcel(
+  records: AttendanceRecord[],
+  summaries: EmployeeSummary[],
+  filename = 'Master_Attendance_Payroll_Report.xlsx',
+  options: {
+    includePayroll?: boolean;
+    includeDailyLogs?: boolean;
+    includeOvertime?: boolean;
+  } = { includePayroll: true, includeDailyLogs: true, includeOvertime: true }
+) {
+  const workbook = XLSX.utils.book_new();
+
+  if (options.includePayroll && summaries.length > 0) {
+    const payrollData = summaries.map((s, i) => ({
+      'S.No': i + 1,
+      'Emp Code': s.empId,
+      'Employee Name': s.empName,
+      'Department': s.department,
+      'Total Logged Days': s.totalDays,
+      'Full Days (1.0)': s.presentDays,
+      'Half Days (0.5)': s.halfDays,
+      'Absent Days (0.0)': s.absentDays,
+      'On Duty (OD)': s.totalOnDuty || 0,
+      'Sunday / Off': s.totalSundays || 0,
+      'Holiday': s.totalHolidays || 0,
+      'Total Work Hours': s.totalWorkHours,
+      'Total OT Hours': s.totalOtHours,
+      'Total OT Duty Days': s.totalOtDuties || 0,
+      'Net Payable Total Days': s.netPayableDays,
+    }));
+    const payrollSheet = XLSX.utils.json_to_sheet(payrollData);
+    XLSX.utils.book_append_sheet(workbook, payrollSheet, 'Payroll Summary');
+  }
+
+  if (options.includeDailyLogs && records.length > 0) {
+    const dailyData = records.map((r, i) => {
+      const overtimeHours = r.overtimeHours !== undefined ? r.overtimeHours : Math.floor((parseTimeToMinutes(r.extraTime) || 0) / 60);
+      const otDuty = r.otDuty !== undefined ? r.otDuty : (
+        overtimeHours >= 2.0
+          ? (overtimeHours >= 8 ? 1.0 : overtimeHours >= 6 ? 0.75 : overtimeHours >= 4 ? 0.5 : 0.25)
+          : 0
+      );
+      const onDuty = r.onDuty !== undefined ? r.onDuty : (r.status === 'PRESENT' ? 1 : r.status === 'HALF_DAY' ? 0.5 : 0);
+      const sunday = r.sunday !== undefined ? r.sunday : 0;
+      const holiday = r.holiday !== undefined ? r.holiday : 0;
+      const total = r.dayTotal !== undefined ? r.dayTotal : Number((onDuty + otDuty + sunday + holiday).toFixed(2));
+
+      return {
+        'S.No': i + 1,
+        'Emp Code': r.empId,
+        'Employee Name': r.empName,
+        'Department': r.department,
+        'Shift': r.shift || 'KG',
+        'Punch Date': r.date,
+        'IN Time': r.inTime,
+        'OUT Time': r.outTime,
+        'Muster': r.muster || (r.status === 'PRESENT' ? 'PP' : r.status === 'HALF_DAY' ? 'PA' : 'AA'),
+        'Working time': r.worktime || (r.totalMinutes > 0 ? formatMinutesToTime(r.totalMinutes) : '-'),
+        'Extra Time': r.extraTime || '-',
+        'Overtime (ht)': overtimeHours,
+        'Late Come': r.lateCome || '-',
+        'Early Go': r.earlyGo || '-',
+        'Late Go': r.lateGo || '-',
+        'OT Duty': otDuty,
+        'On Duty': onDuty,
+        'Sunday': sunday,
+        'Holiday': holiday,
+        'Day Total': total,
+        'Status': r.status,
+      };
+    });
+    const dailySheet = XLSX.utils.json_to_sheet(dailyData);
+    XLSX.utils.book_append_sheet(workbook, dailySheet, 'Daily Punch Logs');
+  }
+
+  if (options.includeOvertime && summaries.length > 0) {
+    const otData = [...summaries]
+      .filter(s => s.totalOtHours > 0)
+      .sort((a, b) => b.totalOtHours - a.totalOtHours)
+      .map((s, index) => {
+        let otCategory = 'Low Overtime (1-20h)';
+        if (s.totalOtHours >= 50) otCategory = 'Heavy Overtime (> 50h)';
+        else if (s.totalOtHours >= 20) otCategory = 'Moderate Overtime (20-50h)';
+
+        return {
+          'Rank': index + 1,
+          'Employee ID': s.empId,
+          'Employee Name': s.empName,
+          'Department': (s.department || 'GENERAL').trim().toUpperCase(),
+          'Present Days': s.presentDays,
+          'Total Work Hours': s.totalWorkHours,
+          'Total OT Hours': s.totalOtHours,
+          'OT Duty Days': s.totalOtDuties ?? 0,
+          'Net Payable Days': s.netPayableDays,
+          'OT Category': otCategory,
+        };
+      });
+    const otSheet = XLSX.utils.json_to_sheet(otData);
+    XLSX.utils.book_append_sheet(workbook, otSheet, 'OT Duty Audit');
+  }
 
   const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
   const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });

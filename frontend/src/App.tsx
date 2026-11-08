@@ -9,6 +9,7 @@ import { PayrollTimesheetTab } from './components/PayrollTimesheetTab';
 import { OvertimeAnalyticsTab } from './components/OvertimeAnalyticsTab';
 import { SettingsTab } from './components/SettingsTab';
 import { CompanyLeaveTab } from './components/CompanyLeaveTab';
+import { ExportReportsModal } from './components/ExportReportsModal';
 import { SkeletonBanner, SkeletonCardGrid, SkeletonTable } from './components/common/Skeleton';
 import { AttendanceRecord, ShiftConfig, EmployeeSummary } from './types/attendance';
 import { AdminUser } from './types/auth';
@@ -30,6 +31,7 @@ export function App() {
 
   const [currentTab, setCurrentTab] = useState<TabType>('overview');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [isExportReportsOpen, setIsExportReportsOpen] = useState<boolean>(false);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [summaries, setSummaries] = useState<EmployeeSummary[]>([]);
   const [config, setConfig] = useState<ShiftConfig>(DEFAULT_SHIFT_CONFIG);
@@ -122,6 +124,7 @@ export function App() {
           admin={adminUser}
           onLogout={handleLogout}
           onOpenUpload={() => setCurrentTab('upload')}
+          onOpenExportReports={() => setIsExportReportsOpen(true)}
           onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         />
 
@@ -203,6 +206,15 @@ export function App() {
         </main>
         </div>
       </div>
+
+      {/* Enterprise Multi-Filter Export & Reports Modal */}
+      <ExportReportsModal
+        isOpen={isExportReportsOpen}
+        onClose={() => setIsExportReportsOpen(false)}
+        records={records}
+        summaries={summaries}
+        config={config}
+      />
     </div>
   );
 }
