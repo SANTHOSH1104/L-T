@@ -281,7 +281,7 @@ export function processAttendanceRecord(
       totalMinutes: 0,
       totalHours: 0,
       status: 'MISSED_PUNCH',
-      isLate: inMinutes !== null && inMinutes > shiftStartMin + config.graceMinutes,
+      isLate: inMinutes !== null && inMinutes > shiftStartMin + graceMinutes,
       isEarlyExit: false,
       otMinutes: 0,
       otHours: 0,
