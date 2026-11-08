@@ -19,7 +19,9 @@ import {
   ChevronRight,
   FileCheck,
   CalendarCheck,
-  CalendarDays
+  CalendarDays,
+  X,
+  UserCheck
 } from 'lucide-react';
 import { AttendanceRecord, EmployeeSummary, ShiftConfig } from '../types/attendance';
 import { generateEmployeeSummaries } from '../utils/calculator';
@@ -50,6 +52,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedDept, setSelectedDept] = useState<string>('ALL');
   const [selectedEmpIds, setSelectedEmpIds] = useState<string[]>([]);
+  const [showOnlySelected, setShowOnlySelected] = useState<boolean>(false);
 
   // Sorting & Pagination
   const [sortBy, setSortBy] = useState<'id' | 'name' | 'present' | 'payable' | 'ot'>('id');
@@ -122,10 +125,16 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
     return generateEmployeeSummaries(dateFilteredRecords, config);
   }, [dateFilteredRecords, config]);
 
-  // 3. Filter and Sort the dynamic summaries by Employee Search, Dept, and Multi-select
+  // 3. Filter and Sort the dynamic summaries for the Live Table Display
+  // IMPORTANT: We do NOT filter out non-selected employees by default so you can check 2, 3, 5, or more staff!
   const filteredAndSortedEmployees = useMemo(() => {
     return dynamicSummaries
       .filter(emp => {
+        // If user explicitly toggled "Show Only Selected"
+        if (showOnlySelected && selectedEmpIds.length > 0 && !selectedEmpIds.includes(emp.empId)) {
+          return false;
+        }
+
         // Search query
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
@@ -140,11 +149,6 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
           if ((emp.department || '').trim().toUpperCase() !== selectedDept) return false;
         }
 
-        // Multi-select filter (if any are specifically checked)
-        if (selectedEmpIds.length > 0 && !selectedEmpIds.includes(emp.empId)) {
-          return false;
-        }
-
         return true;
       })
       .sort((a, b) => {
@@ -156,13 +160,24 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
         else if (sortBy === 'ot') diff = b.totalOtHours - a.totalOtHours;
         return sortOrder === 'asc' ? diff : -diff;
       });
-  }, [dynamicSummaries, searchQuery, selectedDept, selectedEmpIds, sortBy, sortOrder]);
+  }, [dynamicSummaries, showOnlySelected, selectedEmpIds, searchQuery, selectedDept, sortBy, sortOrder]);
 
-  // Target records for export (matching the filtered employee list)
+  // 4. Target Employees for Export:
+  // If user selected 1 or more specific employees via checkbox -> export those selected!
+  // Otherwise -> export all currently filtered employees!
+  const targetEmployeesForExport = useMemo(() => {
+    if (selectedEmpIds.length > 0) {
+      const selectedSet = new Set(selectedEmpIds);
+      return dynamicSummaries.filter(e => selectedSet.has(e.empId));
+    }
+    return filteredAndSortedEmployees;
+  }, [dynamicSummaries, selectedEmpIds, filteredAndSortedEmployees]);
+
+  // Target records for export (matching the target employees)
   const targetRecordsForExport = useMemo(() => {
-    const targetEmpIdSet = new Set(filteredAndSortedEmployees.map(e => e.empId));
+    const targetEmpIdSet = new Set(targetEmployeesForExport.map(e => e.empId));
     return dateFilteredRecords.filter(r => targetEmpIdSet.has(r.empId));
-  }, [dateFilteredRecords, filteredAndSortedEmployees]);
+  }, [dateFilteredRecords, targetEmployeesForExport]);
 
   // Pagination calculation
   const totalPages = pageSize === -1 ? 1 : Math.ceil(filteredAndSortedEmployees.length / pageSize);
@@ -181,7 +196,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
 
   const handleSelectAllVisible = () => {
     const visibleIds = paginatedEmployees.map(e => e.empId);
-    const allVisibleSelected = visibleIds.every(id => selectedEmpIds.includes(id));
+    const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedEmpIds.includes(id));
     if (allVisibleSelected) {
       setSelectedEmpIds(prev => prev.filter(id => !visibleIds.includes(id)));
     } else {
@@ -191,28 +206,29 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
 
   const handleClearAllSelections = () => {
     setSelectedEmpIds([]);
+    setShowOnlySelected(false);
   };
 
   // Generated File Name Preview
   const generatedFilename = useMemo(() => {
     const cleanComp = (config.companyName || 'PunchPulse').replace(/[^a-zA-Z0-9]/g, '_');
-    if (filteredAndSortedEmployees.length === 1) {
-      const emp = filteredAndSortedEmployees[0];
-      const cleanName = emp.empName.replace(/[^a-zA-Z0-9]/g, '_');
-      return `${emp.empId}_${cleanName}_Attendance_${startDate}_to_${endDate}.xlsx`;
+    if (selectedEmpIds.length === 1) {
+      const emp = summaries.find(s => s.empId === selectedEmpIds[0]);
+      const cleanName = (emp?.empName || 'Employee').replace(/[^a-zA-Z0-9]/g, '_');
+      return `${selectedEmpIds[0]}_${cleanName}_Attendance_${startDate}_to_${endDate}.xlsx`;
+    }
+    if (selectedEmpIds.length > 1) {
+      return `${cleanComp}_Selected_${selectedEmpIds.length}_Employees_${startDate}_to_${endDate}.xlsx`;
     }
     if (selectedDept !== 'ALL') {
       return `${cleanComp}_${selectedDept}_Report_${startDate}_to_${endDate}.xlsx`;
     }
-    if (selectedEmpIds.length > 0) {
-      return `${cleanComp}_Selected_${selectedEmpIds.length}_Staff_${startDate}_to_${endDate}.xlsx`;
-    }
     return `${cleanComp}_Master_Payroll_Report_${startDate}_to_${endDate}.xlsx`;
-  }, [config.companyName, filteredAndSortedEmployees, selectedDept, selectedEmpIds, startDate, endDate]);
+  }, [config.companyName, selectedEmpIds, summaries, selectedDept, startDate, endDate]);
 
   // Master Export Action
   const handleExecuteExport = () => {
-    if (targetRecordsForExport.length === 0 || filteredAndSortedEmployees.length === 0) {
+    if (targetRecordsForExport.length === 0 || targetEmployeesForExport.length === 0) {
       alert('No matching attendance records found to export for the selected date range.');
       return;
     }
@@ -222,16 +238,16 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
       if (reportType === 'MASTER') {
         exportMasterReportToExcel(
           targetRecordsForExport,
-          filteredAndSortedEmployees,
+          targetEmployeesForExport,
           generatedFilename,
           { includePayroll: true, includeDailyLogs: true, includeOvertime: true }
         );
       } else if (reportType === 'PAYROLL') {
-        exportPayrollSummaryToExcel(filteredAndSortedEmployees, generatedFilename);
+        exportPayrollSummaryToExcel(targetEmployeesForExport, generatedFilename);
       } else if (reportType === 'LOGS') {
         exportAttendanceToExcel(targetRecordsForExport, generatedFilename);
       } else if (reportType === 'OVERTIME') {
-        exportOvertimeReportToExcel(filteredAndSortedEmployees, generatedFilename);
+        exportOvertimeReportToExcel(targetEmployeesForExport, generatedFilename);
       }
 
       setSuccessBanner(`Downloaded ${generatedFilename} successfully!`);
@@ -262,10 +278,10 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
   };
 
   // Stats for the Live Pre-Download Cards
-  const totalWorkforceSelected = filteredAndSortedEmployees.length;
+  const totalWorkforceSelected = targetEmployeesForExport.length;
   const totalDailyRecordsCount = targetRecordsForExport.length;
-  const totalPayableDaysSum = Number(filteredAndSortedEmployees.reduce((acc, e) => acc + e.netPayableDays, 0).toFixed(1));
-  const totalOtHoursSum = Number(filteredAndSortedEmployees.reduce((acc, e) => acc + e.totalOtHours, 0).toFixed(1));
+  const totalPayableDaysSum = Number(targetEmployeesForExport.reduce((acc, e) => acc + e.netPayableDays, 0).toFixed(1));
+  const totalOtHoursSum = Number(targetEmployeesForExport.reduce((acc, e) => acc + e.totalOtHours, 0).toFixed(1));
 
   return (
     <div className="w-full space-y-6">
@@ -278,7 +294,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
             <FileSpreadsheet className="w-3.5 h-3.5 text-amber-300" />
             <span>ENTERPRISE REPORTING & EXPORT CENTER</span>
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-            <span>Live Recalculation Engine</span>
+            <span>Multi-Employee Selection Enabled</span>
           </div>
 
           <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
@@ -286,8 +302,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
           </h2>
 
           <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-            Generate and download verified Excel reports for a single person, selected employees, or the full company.
-            Select custom date ranges or fortnights — the engine dynamically recomputes exact present and net payable days.
+            Select single, multiple (two or more), or all employees using the checkboxes below.
+            Choose any date range or fortnight — present days and overtime totals recalculate dynamically!
           </p>
         </div>
 
@@ -299,7 +315,14 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
             className="px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-black text-xs sm:text-sm flex items-center justify-center space-x-2 shadow-lg shadow-emerald-600/30 transition-all cursor-pointer active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Download className="w-4 h-4" />
-            <span>{isExporting ? 'Generating Excel...' : 'Download Excel (.xlsx)'}</span>
+            <span>
+              {isExporting 
+                ? 'Generating Excel...' 
+                : selectedEmpIds.length > 0 
+                  ? `Download Selected (${selectedEmpIds.length}) Staff (.xlsx)` 
+                  : 'Download All Records (.xlsx)'
+              }
+            </span>
           </button>
         </div>
       </div>
@@ -322,14 +345,18 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
         {/* Card 1: Target Workforce */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-indigo-300 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Selected Workforce</span>
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              {selectedEmpIds.length > 0 ? 'Selected Workforce' : 'Total Workforce'}
+            </span>
             <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
               <Users className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-3">
             <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight font-mono">
-              {totalWorkforceSelected} <span className="text-sm font-medium text-slate-500 font-sans">/ {summaries.length} Staff</span>
+              {totalWorkforceSelected} <span className="text-sm font-medium text-slate-500 font-sans">
+                {selectedEmpIds.length > 0 ? `Selected of ${summaries.length}` : 'Staff Total'}
+              </span>
             </div>
             <div className="mt-2 flex items-center space-x-1.5 text-xs text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg w-fit font-medium">
               <Building2 className="w-3.5 h-3.5 text-indigo-600" />
@@ -537,7 +564,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               <input
                 type="text"
-                placeholder="Search single person by Name or Emp ID (e.g. 107815)..."
+                placeholder="Search by Name or Emp ID to select or find staff..."
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                 className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 outline-none transition-all"
@@ -565,19 +592,28 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
             {selectedEmpIds.length > 0 ? (
               <div className="flex items-center space-x-2 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl">
                 <span className="text-xs font-bold text-indigo-900 font-mono">
-                  {selectedEmpIds.length} Staff Checked
+                  {selectedEmpIds.length} Staff Selected
                 </span>
+                <button
+                  type="button"
+                  onClick={() => setShowOnlySelected(!showOnlySelected)}
+                  className={`text-[11px] font-bold px-2 py-0.5 rounded-md cursor-pointer transition-all ${
+                    showOnlySelected ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                  }`}
+                >
+                  {showOnlySelected ? 'Show All Table' : 'Show Selected Only'}
+                </button>
                 <button
                   type="button"
                   onClick={handleClearAllSelections}
                   className="text-[11px] font-bold text-rose-600 hover:text-rose-800 underline cursor-pointer"
                 >
-                  Clear Selection
+                  Clear
                 </button>
               </div>
             ) : (
               <span className="text-xs text-slate-500 font-medium">
-                {searchQuery ? 'Filtered results' : 'Showing all staff by default'}
+                Tip: Click row or checkbox to select multiple staff
               </span>
             )}
 
@@ -588,10 +624,49 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
               className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-all cursor-pointer active:scale-95 disabled:opacity-50"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Export {selectedEmpIds.length > 0 ? `(${selectedEmpIds.length})` : 'All'}</span>
+              <span>Export {selectedEmpIds.length > 0 ? `Selected (${selectedEmpIds.length})` : 'All'}</span>
             </button>
           </div>
         </div>
+
+        {/* Selected Staff Tags (Visual preview when employees are selected) */}
+        {selectedEmpIds.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 p-3 rounded-2xl bg-indigo-50/80 border border-indigo-200">
+            <div className="flex items-center space-x-1.5 text-xs font-bold text-indigo-900 mr-1.5">
+              <UserCheck className="w-4 h-4 text-indigo-600" />
+              <span>Selected ({selectedEmpIds.length}):</span>
+            </div>
+            {selectedEmpIds.slice(0, 6).map(id => {
+              const emp = summaries.find(s => s.empId === id);
+              return (
+                <span key={id} className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-xs font-bold text-slate-800 shadow-2xs">
+                  <span className="font-mono text-slate-400 text-[10px]">{id}</span>
+                  <span>{emp?.empName || id}</span>
+                  <button 
+                    type="button" 
+                    onClick={(e) => { e.stopPropagation(); toggleSelectEmp(id); }} 
+                    className="text-slate-400 hover:text-rose-600 ml-1 cursor-pointer font-extrabold"
+                    title="Remove from selection"
+                  >
+                    ×
+                  </button>
+                </span>
+              );
+            })}
+            {selectedEmpIds.length > 6 && (
+              <span className="text-xs font-bold text-indigo-700 font-mono px-2 py-0.5 rounded-md bg-indigo-100">
+                +{selectedEmpIds.length - 6} more
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={handleClearAllSelections}
+              className="ml-auto text-xs font-bold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer"
+            >
+              Clear All ({selectedEmpIds.length})
+            </button>
+          </div>
+        )}
 
         {/* Live File Preview Chip */}
         <div className="flex items-center justify-between text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-100 font-mono">
@@ -613,11 +688,11 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
             <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
               Live Attendance & Timesheet Ledger
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-mono font-bold border border-indigo-200">
-                {filteredAndSortedEmployees.length} Employees
+                {filteredAndSortedEmployees.length} Employees in Table
               </span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Live calculated present days and overtime duty for {startDate} to {endDate}. Click the download icon on any row for that single person's report.
+              Click any row or checkbox to select employees. Date range: {startDate} to {endDate}.
             </p>
           </div>
 
@@ -645,12 +720,12 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-50/90 border-b border-slate-200/80 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                {/* Checkbox column */}
-                <th className="py-3 px-3 text-center w-10">
+                {/* Master Checkbox */}
+                <th className="py-3 px-3 text-center w-12">
                   <button
                     type="button"
                     onClick={handleSelectAllVisible}
-                    title="Select/Deselect visible employees"
+                    title="Select/Deselect visible employees on this page"
                     className="p-1 rounded text-slate-400 hover:text-indigo-600 cursor-pointer"
                   >
                     <CheckSquare className="w-4 h-4" />
@@ -689,16 +764,26 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
 
                   return (
                     <tr 
-                      key={emp.empId} 
-                      className={`hover:bg-indigo-50/30 transition-colors group ${
-                        isChecked ? 'bg-indigo-50/40' : ''
+                      key={emp.empId}
+                      onClick={(e) => {
+                        // Don't toggle if clicking the individual row export button
+                        if ((e.target as HTMLElement).closest('button')) return;
+                        toggleSelectEmp(emp.empId);
+                      }}
+                      className={`transition-colors cursor-pointer select-none ${
+                        isChecked 
+                          ? 'bg-indigo-50/80 hover:bg-indigo-100/70' 
+                          : 'hover:bg-slate-50/80'
                       }`}
                     >
                       {/* Checkbox */}
                       <td className="py-3 px-3 text-center">
                         <button
                           type="button"
-                          onClick={() => toggleSelectEmp(emp.empId)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleSelectEmp(emp.empId);
+                          }}
                           className="p-1 rounded text-slate-400 hover:text-indigo-600 cursor-pointer"
                         >
                           {isChecked ? (
@@ -715,9 +800,12 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                       </td>
 
                       {/* Employee Details (Sticky Column) */}
-                      <td className="py-3 px-4 sticky left-0 bg-white group-hover:bg-indigo-50/50 z-10 shadow-xs">
-                        <div className="font-bold text-slate-900 group-hover:text-indigo-900 text-sm">
-                          {emp.empName}
+                      <td className={`py-3 px-4 sticky left-0 z-10 shadow-xs ${
+                        isChecked ? 'bg-indigo-50/90 font-bold text-indigo-950' : 'bg-white'
+                      }`}>
+                        <div className="font-bold text-slate-900 group-hover:text-indigo-900 text-sm flex items-center gap-1.5">
+                          {isChecked && <span className="w-1.5 h-1.5 rounded-full bg-indigo-600"></span>}
+                          <span>{emp.empName}</span>
                         </div>
                         <div className="text-[11px] font-mono text-slate-400">
                           {emp.empId}
@@ -790,7 +878,10 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                       <td className="py-3 px-3 text-center">
                         <button
                           type="button"
-                          onClick={() => handleExportSingleEmployee(emp)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleExportSingleEmployee(emp);
+                          }}
                           title={`Download personal Excel report for ${emp.empName}`}
                           className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-indigo-600 hover:text-white text-slate-700 text-[11px] font-bold transition-all cursor-pointer shadow-2xs"
                         >
@@ -863,6 +954,38 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
           </div>
         )}
       </div>
+
+      {/* Floating Bottom Quick Bar when 2 or more employees are checked */}
+      {selectedEmpIds.length >= 2 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 backdrop-blur-md text-white px-5 py-3.5 rounded-2xl shadow-2xl border border-indigo-500/40 flex items-center space-x-4 animate-in slide-in-from-bottom duration-200">
+          <div className="flex items-center space-x-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="text-xs font-bold font-mono">
+              {selectedEmpIds.length} Employees Selected
+            </span>
+          </div>
+
+          <div className="h-4 w-px bg-slate-700"></div>
+
+          <button
+            onClick={handleExecuteExport}
+            disabled={isExporting}
+            className="inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/30 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Download Selected ({selectedEmpIds.length}) Report</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleClearAllSelections}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            title="Deselect all"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };
