@@ -545,3 +545,143 @@ export const exportProcessedExcel = (req: Request, res: Response): void => {
     res.status(500).json({ success: false, message: 'Failed to export excel' });
   }
 };
+
+// 7. COMPANY HOLIDAY & LEAVE CALENDAR CONTROLLERS
+export const getCompanyHolidays = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const holidays = await getAllRows<any>('SELECT * FROM company_holidays ORDER BY date ASC');
+    res.json({
+      success: true,
+      data: holidays.map(h => ({
+        id: h.id,
+        date: h.date,
+        name: h.name,
+        type: h.type,
+        isPaid: Boolean(Number(h.isPaid)),
+        createdAt: h.createdAt,
+        updatedAt: h.updatedAt,
+      }))
+    });
+  } catch (err) {
+    console.error('Error fetching company holidays:', err);
+    res.status(500).json({ success: false, message: 'Failed to fetch company holidays' });
+  }
+};
+
+export const applyHolidayToAttendance = async (date: string, name: string, isPaid: number): Promise<void> => {
+  // 1. Non-punched records on this holiday date
+  await runQuery(`
+    UPDATE attendance_logs
+    SET 
+      muster = 'HL',
+      status = 'HOLIDAY',
+      holiday = ?,
+      onDuty = 0.00,
+      sunday = 0.00,
+      dayTotal = ?,
+      notes = ?
+    WHERE date = ? AND (inTime = '--:--' OR inTime = '' OR inTime = '-')
+  `, [isPaid ? 1.00 : 0.00, isPaid ? 1.00 : 0.00, `${name} (Company Holiday)`, date]);
+
+  // 2. Punched records (worked on holiday)
+  await runQuery(`
+    UPDATE attendance_logs
+    SET 
+      muster = 'HP',
+      status = 'PRESENT',
+      holiday = ?,
+      onDuty = 0.00,
+      dayTotal = ? + otDuty,
+      notes = CONCAT('Worked on Holiday: ', ?)
+    WHERE date = ? AND inTime != '--:--' AND inTime != '' AND inTime != '-'
+  `, [isPaid ? 1.00 : 0.00, isPaid ? 1.00 : 0.00, name, date]);
+};
+
+export const revertHolidayFromAttendance = async (date: string): Promise<void> => {
+  // Revert non-punched back to absent
+  await runQuery(`
+    UPDATE attendance_logs
+    SET 
+      muster = 'AA',
+      status = 'ABSENT',
+      holiday = 0.00,
+      dayTotal = 0.00,
+      notes = 'Absent (No Punch)'
+    WHERE date = ? AND (inTime = '--:--' OR inTime = '' OR inTime = '-')
+  `, [date]);
+
+  // Revert punched back to regular present
+  await runQuery(`
+    UPDATE attendance_logs
+    SET 
+      muster = 'PP',
+      status = 'PRESENT',
+      holiday = 0.00,
+      onDuty = 1.00,
+      dayTotal = 1.00 + otDuty,
+      notes = NULL
+    WHERE date = ? AND inTime != '--:--' AND inTime != '' AND inTime != '-'
+  `, [date]);
+};
+
+export const createCompanyHoliday = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { date, name, type, isPaid } = req.body;
+    if (!date || !name) {
+      res.status(400).json({ success: false, message: 'Date and holiday name are required' });
+      return;
+    }
+    const id = `hol-${Date.now()}`;
+    const holidayType = type || 'PUBLIC_HOLIDAY';
+    const paidVal = isPaid !== false ? 1 : 0;
+
+    await runQuery(`
+      REPLACE INTO company_holidays (id, date, name, type, isPaid)
+      VALUES (?, ?, ?, ?, ?)
+    `, [id, date.trim(), name.trim(), holidayType, paidVal]);
+
+    await applyHolidayToAttendance(date.trim(), name.trim(), paidVal);
+
+    res.json({ 
+      success: true, 
+      message: `Company holiday '${name}' added for date ${date} and applied to attendance logs` 
+    });
+  } catch (err) {
+    console.error('Error creating holiday:', err);
+    res.status(500).json({ success: false, message: 'Failed to create company holiday' });
+  }
+};
+
+export const deleteCompanyHoliday = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const existing = await getRow<any>('SELECT * FROM company_holidays WHERE id = ?', [id]);
+    if (!existing) {
+      res.status(404).json({ success: false, message: 'Holiday not found' });
+      return;
+    }
+    await runQuery('DELETE FROM company_holidays WHERE id = ?', [id]);
+    await revertHolidayFromAttendance(existing.date);
+
+    res.json({ success: true, message: `Company holiday '${existing.name}' deleted and attendance reverted` });
+  } catch (err) {
+    console.error('Error deleting holiday:', err);
+    res.status(500).json({ success: false, message: 'Failed to delete company holiday' });
+  }
+};
+
+export const syncAllHolidays = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const holidays = await getAllRows<any>('SELECT * FROM company_holidays');
+    for (const h of holidays) {
+      await applyHolidayToAttendance(h.date, h.name, Number(h.isPaid));
+    }
+    res.json({ 
+      success: true, 
+      message: `Successfully synchronized ${holidays.length} company holidays to attendance database!` 
+    });
+  } catch (err) {
+    console.error('Error syncing holidays:', err);
+    res.status(500).json({ success: false, message: 'Failed to sync company holidays' });
+  }
+};

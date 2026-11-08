@@ -1,4 +1,4 @@
-import { AttendanceRecord, ColumnMapping, EmployeeSummary, ShiftConfig } from '../types/attendance';
+import { AttendanceRecord, ColumnMapping, CompanyHoliday, EmployeeSummary, ShiftConfig } from '../types/attendance';
 import { AdminUser } from '../types/auth';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -181,6 +181,64 @@ export async function clearAllLogsInDb(): Promise<void> {
   const data = await res.json();
   if (!res.ok || !data.success) {
     throw new Error(data.message || 'Failed to clear logs');
+  }
+}
+
+// 9. COMPANY HOLIDAYS & LEAVES API
+export async function fetchCompanyHolidays(): Promise<CompanyHoliday[]> {
+  const token = getAuthToken();
+  const res = await fetch(`${API_BASE}/attendance/holidays`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to fetch company holidays');
+  }
+  return data.data || [];
+}
+
+export async function createCompanyHoliday(holiday: {
+  date: string;
+  name: string;
+  type?: string;
+  isPaid?: boolean;
+}): Promise<void> {
+  const token = getAuthToken();
+  const res = await fetch(`${API_BASE}/attendance/holidays`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(holiday)
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to add company holiday');
+  }
+}
+
+export async function deleteCompanyHoliday(id: string): Promise<void> {
+  const token = getAuthToken();
+  const res = await fetch(`${API_BASE}/attendance/holidays/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to delete company holiday');
+  }
+}
+
+export async function syncCompanyHolidays(): Promise<void> {
+  const token = getAuthToken();
+  const res = await fetch(`${API_BASE}/attendance/holidays/sync`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to sync company holidays');
   }
 }
 

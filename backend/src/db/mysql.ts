@@ -196,6 +196,38 @@ export async function initDatabase() {
     ]);
   }
 
+  // 6. Company Holidays & Leaves Table
+  await runQuery(`
+    CREATE TABLE IF NOT EXISTS company_holidays (
+      id VARCHAR(64) PRIMARY KEY,
+      date VARCHAR(32) NOT NULL UNIQUE,
+      name VARCHAR(191) NOT NULL,
+      type VARCHAR(64) NOT NULL DEFAULT 'PUBLIC_HOLIDAY',
+      isPaid TINYINT(1) NOT NULL DEFAULT 1,
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX (date)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  // Seed default company leaves if not present
+  const defaultHolidays = [
+    { id: 'hol-1', date: '2026-10-02', name: 'Gandhi Jayanti', type: 'PUBLIC_HOLIDAY', isPaid: 1 },
+    { id: 'hol-2', date: '2026-10-19', name: 'Ayudha Pooja / Vijaya Dashami', type: 'FESTIVAL', isPaid: 1 },
+    { id: 'hol-3', date: '2026-11-08', name: 'Diwali / Deepavali', type: 'FESTIVAL', isPaid: 1 },
+    { id: 'hol-4', date: '2026-12-25', name: 'Christmas Day', type: 'PUBLIC_HOLIDAY', isPaid: 1 },
+    { id: 'hol-5', date: '2027-01-01', name: 'New Year Day', type: 'COMPANY_OFF', isPaid: 1 },
+    { id: 'hol-6', date: '2027-01-14', name: 'Pongal / Makar Sankranti', type: 'FESTIVAL', isPaid: 1 },
+    { id: 'hol-7', date: '2027-01-26', name: 'Republic Day', type: 'PUBLIC_HOLIDAY', isPaid: 1 },
+  ];
+
+  for (const h of defaultHolidays) {
+    await runQuery(`
+      INSERT IGNORE INTO company_holidays (id, date, name, type, isPaid)
+      VALUES (?, ?, ?, ?, ?)
+    `, [h.id, h.date, h.name, h.type, h.isPaid]);
+  }
+
   // Database initialized cleanly. Sample re-seeding removed so user can maintain clean custom records.
 }
 

@@ -8,6 +8,7 @@ import { DailyLogsTab } from './components/DailyLogsTab';
 import { PayrollTimesheetTab } from './components/PayrollTimesheetTab';
 import { OvertimeAnalyticsTab } from './components/OvertimeAnalyticsTab';
 import { SettingsTab } from './components/SettingsTab';
+import { CompanyLeaveTab } from './components/CompanyLeaveTab';
 import { AttendanceRecord, ShiftConfig, EmployeeSummary } from './types/attendance';
 import { AdminUser } from './types/auth';
 import { DEFAULT_SHIFT_CONFIG } from './utils/calculator';
@@ -164,6 +165,13 @@ export function App() {
                 <OvertimeAnalyticsTab
                   summaries={summaries}
                   config={config}
+                />
+              )}
+
+              {currentTab === 'holidays' && (
+                <CompanyLeaveTab
+                  config={config}
+                  onRefreshData={loadBackendData}
                 />
               )}
 

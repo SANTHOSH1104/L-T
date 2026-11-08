@@ -25,7 +25,17 @@ export interface ShiftConfig {
   shifts?: ShiftDefinition[];   // Multi-shift rules: KG, K1, K2, K3, K6
 }
 
-export type AttendanceStatus = 'PRESENT' | 'HALF_DAY' | 'ABSENT' | 'MISSED_PUNCH';
+export type AttendanceStatus = 'PRESENT' | 'HALF_DAY' | 'ABSENT' | 'MISSED_PUNCH' | 'HOLIDAY' | 'WEEKLY_OFF';
+
+export interface CompanyHoliday {
+  id: string;
+  date: string; // YYYY-MM-DD
+  name: string;
+  type: 'PUBLIC_HOLIDAY' | 'FESTIVAL' | 'COMPANY_OFF' | 'OPTIONAL';
+  isPaid: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 export interface AttendanceRecord {
   id: string;

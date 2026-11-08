@@ -308,7 +308,7 @@ export const DailyLogsTab: React.FC<DailyLogsTabProps> = ({
                       </td>
                       <td className="py-3 px-3">
                         <Badge 
-                          status={r.muster === 'PP' ? 'PP' : r.muster === 'PA' ? 'PA' : r.muster === 'AP' ? 'AP' : r.muster === 'AA' ? 'AA' : (r.muster === 'WO' || r.muster === 'WW') ? 'WW' : r.status} 
+                          status={r.muster === 'PP' ? 'PP' : r.muster === 'PA' ? 'PA' : r.muster === 'AP' ? 'AP' : r.muster === 'AA' ? 'AA' : (r.muster === 'WO' || r.muster === 'WW') ? 'WW' : (r.muster === 'HL' || r.status === 'HOLIDAY') ? 'HL' : r.muster === 'HP' ? 'HP' : r.status} 
                           label={r.muster ? `${r.muster}` : undefined}
                         />
                       </td>

@@ -7,11 +7,12 @@ import {
   ClockAlert, 
   Settings, 
   CheckCircle2,
-  Building2
+  Building2,
+  CalendarDays
 } from 'lucide-react';
 import { ShiftConfig } from '../types/attendance';
 
-export type TabType = 'overview' | 'upload' | 'logs' | 'payroll' | 'overtime' | 'settings';
+export type TabType = 'overview' | 'upload' | 'logs' | 'payroll' | 'overtime' | 'holidays' | 'settings';
 
 interface SidebarProps {
   currentTab: TabType;
@@ -37,6 +38,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     { id: 'payroll', label: 'Payroll Timesheet', icon: <Users className="w-5 h-5" /> },
     { id: 'overtime', label: 'OT Analytics', icon: <ClockAlert className="w-5 h-5" /> },
+    { id: 'holidays', label: 'Company Leave', icon: <CalendarDays className="w-5 h-5" /> },
     { id: 'settings', label: 'Shift & Rules', icon: <Settings className="w-5 h-5" /> },
   ];
 

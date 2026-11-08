@@ -2,7 +2,7 @@ import React from 'react';
 import { AttendanceStatus } from '../../types/attendance';
 
 export interface BadgeProps {
-  status?: AttendanceStatus | 'OT' | 'LATE' | 'EARLY' | 'PENALTY' | 'PP' | 'PA' | 'AP' | 'AA' | 'WO' | 'WW' | 'HP';
+  status?: AttendanceStatus | 'OT' | 'LATE' | 'EARLY' | 'PENALTY' | 'PP' | 'PA' | 'AP' | 'AA' | 'WO' | 'WW' | 'HP' | 'HL';
   label?: string;
   dot?: boolean;
 }
@@ -38,10 +38,16 @@ export const Badge: React.FC<BadgeProps> = ({ status, label, dot = true }) => {
       dotColor = 'bg-indigo-500';
       defaultText = label || (status === 'WW' ? 'WW' : 'WO');
       break;
+    case 'HOLIDAY':
+    case 'HL':
+      badgeStyle = 'bg-teal-50 text-teal-800 border-teal-200';
+      dotColor = 'bg-teal-500';
+      defaultText = label || (status === 'HL' ? 'HL (Holiday)' : 'Holiday');
+      break;
     case 'HP':
-      badgeStyle = 'bg-cyan-50 text-cyan-700 border-cyan-200';
+      badgeStyle = 'bg-cyan-50 text-cyan-800 border-cyan-200';
       dotColor = 'bg-cyan-500';
-      defaultText = label || 'Holiday';
+      defaultText = label || 'HP (Holiday Work)';
       break;
     case 'MISSED_PUNCH':
       badgeStyle = 'bg-orange-50 text-orange-700 border-orange-200';

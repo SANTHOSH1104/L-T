@@ -9,7 +9,11 @@ import {
   createManualPunch,
   clearAllLogs,
   downloadTemplate, 
-  exportProcessedExcel 
+  exportProcessedExcel,
+  getCompanyHolidays,
+  createCompanyHoliday,
+  deleteCompanyHoliday,
+  syncAllHolidays 
 } from '../controllers/attendance.controller';
 import { authenticateToken } from '../middleware/auth';
 import { validate } from '../middleware/validate.middleware';
@@ -33,6 +37,12 @@ router.post('/upload', authenticateToken, upload.single('file'), uploadAndProces
 router.post('/manual-punch', authenticateToken, validate(manualPunchSchema), createManualPunch);
 router.put('/records/:id', authenticateToken, validate(updatePunchSchema), updatePunchRecord);
 router.delete('/clear', authenticateToken, clearAllLogs);
+
+// Company Leave & Holidays Calendar
+router.get('/holidays', authenticateToken, getCompanyHolidays);
+router.post('/holidays', authenticateToken, createCompanyHoliday);
+router.delete('/holidays/:id', authenticateToken, deleteCompanyHoliday);
+router.post('/holidays/sync', authenticateToken, syncAllHolidays);
 
 // Template and export
 router.get('/template', downloadTemplate);
