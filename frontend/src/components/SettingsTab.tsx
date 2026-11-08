@@ -19,7 +19,8 @@ import {
   Zap,
   Layers,
   CalendarCheck,
-  Award
+  Award,
+  Lock
 } from 'lucide-react';
 import { ShiftConfig, ShiftDefinition } from '../types/attendance';
 import { DEFAULT_SHIFT_CONFIG, DEFAULT_SHIFTS, processAttendanceRecord } from '../utils/calculator';
@@ -31,6 +32,38 @@ interface SettingsTabProps {
   onRefreshData?: () => void;
 }
 
+// Helper to compute full day hours from Punch In & Punch Out (considering overnight)
+const computeShiftHoursFromTimes = (start: string, end: string, isOvernight?: boolean): number => {
+  if (!start || !end) return 8;
+  const sParts = start.trim().split(':');
+  const eParts = end.trim().split(':');
+  if (sParts.length < 2 || eParts.length < 2) return 8;
+
+  const sH = parseInt(sParts[0], 10);
+  const sM = parseInt(sParts[1], 10);
+  const eH = parseInt(eParts[0], 10);
+  const eM = parseInt(eParts[1], 10);
+
+  if (isNaN(sH) || isNaN(sM) || isNaN(eH) || isNaN(eM)) return 8;
+
+  const startMin = sH * 60 + sM;
+  let endMin = eH * 60 + eM;
+
+  if (isOvernight || endMin < startMin) {
+    endMin += 1440;
+  }
+
+  const durationMin = endMin - startMin;
+  const hours = durationMin / 60;
+  return Math.round(hours * 10) / 10;
+};
+
+// Helper for default suggested half day
+const computeDefaultHalfDayHours = (fullDay: number): number => {
+  if (fullDay === 8.5) return 4.0;
+  return Math.round((fullDay / 2) * 10) / 10;
+};
+
 export const SettingsTab: React.FC<SettingsTabProps> = ({
   config,
   onSaveConfig,
@@ -38,7 +71,17 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 }) => {
   const [formData, setFormData] = useState<ShiftConfig>(config);
   const [shifts, setShifts] = useState<ShiftDefinition[]>(() => {
-    return (config.shifts && config.shifts.length > 0) ? config.shifts : DEFAULT_SHIFTS;
+    const raw = (config.shifts && config.shifts.length > 0) ? config.shifts : DEFAULT_SHIFTS;
+    return raw.map(s => {
+      const computedFull = computeShiftHoursFromTimes(s.shiftStart, s.shiftEnd, s.isOvernight);
+      return {
+        ...s,
+        fullDayHours: computedFull, // Auto-calculated from IN & OUT
+        halfDayHours: s.halfDayHours !== undefined && s.halfDayHours !== null 
+          ? s.halfDayHours 
+          : computeDefaultHalfDayHours(computedFull),
+      };
+    });
   });
   const [savedAlert, setSavedAlert] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -75,14 +118,36 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const handleResetDefaults = () => {
     if (window.confirm('Reset all shift timings and calculation rules back to factory defaults?')) {
       setFormData(DEFAULT_SHIFT_CONFIG);
-      setShifts(DEFAULT_SHIFTS);
+      const resetShifts = DEFAULT_SHIFTS.map(s => {
+        const computedFull = computeShiftHoursFromTimes(s.shiftStart, s.shiftEnd, s.isOvernight);
+        return {
+          ...s,
+          fullDayHours: computedFull,
+          halfDayHours: s.halfDayHours !== undefined ? s.halfDayHours : computeDefaultHalfDayHours(computedFull),
+        };
+      });
+      setShifts(resetShifts);
     }
   };
 
   const handleUpdateShift = (index: number, field: keyof ShiftDefinition, value: any) => {
     setShifts(prev => {
       const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
+      const current = { ...updated[index], [field]: value };
+
+      // When Punch In, Punch Out, or Overnight toggle changes:
+      // Automatically recompute fullDayHours (Locked) and auto-suggest halfDayHours
+      if (field === 'shiftStart' || field === 'shiftEnd' || field === 'isOvernight') {
+        const computedFull = computeShiftHoursFromTimes(
+          field === 'shiftStart' ? value : current.shiftStart,
+          field === 'shiftEnd' ? value : current.shiftEnd,
+          field === 'isOvernight' ? value : current.isOvernight
+        );
+        current.fullDayHours = computedFull;
+        current.halfDayHours = computeDefaultHalfDayHours(computedFull);
+      }
+
+      updated[index] = current;
       return updated;
     });
   };
@@ -295,7 +360,12 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               </div>
               <div>
                 <h3 className="font-bold text-slate-900 text-base">Multi-Shift Timing Rules</h3>
-                <p className="text-xs text-slate-400">Shift codes in biometric Excel are automatically matched against these timings</p>
+                <p className="text-xs text-slate-400">
+                  Shift codes in biometric Excel are automatically matched against these timings.
+                  <span className="text-emerald-700 font-semibold ml-1">
+                    ⚡ Full Day is auto-calculated from Punch In &amp; Out. Half Day is editable.
+                  </span>
+                </p>
               </div>
             </div>
             <span className="self-start sm:self-auto px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
@@ -312,8 +382,18 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   <th className="py-3 px-3.5">Shift Name</th>
                   <th className="py-3 px-3">Punch In</th>
                   <th className="py-3 px-3">Punch Out</th>
-                  <th className="py-3 px-3">Full Day</th>
-                  <th className="py-3 px-3">Half Day</th>
+                  <th className="py-3 px-3">
+                    <div className="flex items-center space-x-1">
+                      <span>Full Day</span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">Auto</span>
+                    </div>
+                  </th>
+                  <th className="py-3 px-3">
+                    <div className="flex items-center space-x-1">
+                      <span>Half Day</span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700">Manual</span>
+                    </div>
+                  </th>
                   <th className="py-3 px-3">Grace</th>
                   <th className="py-3 px-3 text-center">Overnight?</th>
                   <th className="py-3 px-3 text-right">Window</th>
@@ -354,21 +434,26 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                       />
                     </td>
                     <td className="py-3 px-3">
-                      <div className="flex items-center space-x-1">
-                        <input
-                          type="number"
-                          step="0.5"
-                          min="0"
-                          max="24"
-                          value={s.fullDayHours || ''}
-                          onChange={(e) => handleUpdateShift(idx, 'fullDayHours', parseFloat(e.target.value) || 0)}
-                          className="w-16 px-2 py-1.5 rounded-lg border border-slate-200 font-mono font-bold text-slate-800 text-center focus:border-indigo-500 outline-none"
-                        />
-                        <span className="text-[11px] text-slate-400">h</span>
+                      <div 
+                        className="flex items-center space-x-1" 
+                        title="Full Day duration is automatically calculated from Punch In and Punch Out (Manual editing locked)"
+                      >
+                        <div className="relative flex items-center">
+                          <input
+                            type="number"
+                            value={s.fullDayHours || ''}
+                            readOnly
+                            disabled
+                            tabIndex={-1}
+                            className="w-16 px-2 py-1.5 pr-5 rounded-lg border border-slate-200 bg-slate-100 text-slate-700 font-mono font-extrabold text-center cursor-not-allowed select-none outline-none shadow-xs"
+                          />
+                          <Lock className="w-2.5 h-2.5 text-slate-400 absolute right-1.5 pointer-events-none" />
+                        </div>
+                        <span className="text-[11px] font-bold text-slate-400">h</span>
                       </div>
                     </td>
                     <td className="py-3 px-3">
-                      <div className="flex items-center space-x-1">
+                      <div className="flex items-center space-x-1" title="Half Day hours can be manually adjusted">
                         <input
                           type="number"
                           step="0.5"
@@ -376,9 +461,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                           max="24"
                           value={s.halfDayHours || ''}
                           onChange={(e) => handleUpdateShift(idx, 'halfDayHours', parseFloat(e.target.value) || 0)}
-                          className="w-16 px-2 py-1.5 rounded-lg border border-slate-200 font-mono font-bold text-slate-800 text-center focus:border-indigo-500 outline-none"
+                          className="w-16 px-2 py-1.5 rounded-lg border border-indigo-200 bg-white font-mono font-bold text-slate-800 text-center focus:border-indigo-500 focus:ring-1 focus:ring-indigo-400 outline-none hover:border-indigo-300 transition-colors"
                         />
-                        <span className="text-[11px] text-slate-400">h</span>
+                        <span className="text-[11px] font-bold text-slate-400">h</span>
                       </div>
                     </td>
                     <td className="py-3 px-3">
