@@ -82,11 +82,11 @@ export const Navbar: React.FC<NavbarProps> = ({
         {onOpenExportReports && (
           <button
             onClick={onOpenExportReports}
-            className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-98"
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-indigo-300 bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 text-indigo-700 text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-98"
             title="Open Enterprise Export & Reports Hub"
           >
             <Download className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-            <span className="hidden sm:inline">Export Reports</span>
+            <span className="font-bold">Export Reports</span>
           </button>
         )}
 
