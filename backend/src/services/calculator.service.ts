@@ -5,7 +5,7 @@ export const DEFAULT_SHIFTS: ShiftDefinition[] = [
   { shiftCode: 'K1', shiftName: 'Morning Shift 1 (K1)', shiftStart: '06:00', shiftEnd: '14:00', fullDayHours: 8, halfDayHours: 4, graceMinutes: 15, isOvernight: false },
   { shiftCode: 'K2', shiftName: 'Afternoon Shift 2 (K2)', shiftStart: '14:30', shiftEnd: '23:00', fullDayHours: 8.5, halfDayHours: 4, graceMinutes: 15, isOvernight: false },
   { shiftCode: 'K3', shiftName: 'Night Shift 3 (K3)', shiftStart: '23:00', shiftEnd: '07:30', fullDayHours: 8.5, halfDayHours: 4, graceMinutes: 15, isOvernight: true },
-  { shiftCode: 'K6', shiftName: 'Extended Night Shift (K6)', shiftStart: '18:00', shiftEnd: '06:00', fullDayHours: 11, halfDayHours: 5, graceMinutes: 15, isOvernight: true },
+  { shiftCode: 'K6', shiftName: 'Extended Night Shift (K6)', shiftStart: '18:00', shiftEnd: '02:00', fullDayHours: 8, halfDayHours: 4, graceMinutes: 15, isOvernight: true },
 ];
 
 export const DEFAULT_SHIFT_CONFIG: ShiftConfig = {
@@ -413,12 +413,21 @@ export function calculateRecord(
   // In standard HR practice, Worktime displays the standard shift duration for full day present
   // (e.g. 08:30 for KG, 08:00 for K1/K2/K3), while extra time worked is captured in Extra Time & OT.
   const standardShiftMin = Math.round(fullDayHours * 60);
-  let formattedWorktime = formatMinutesToTime(standardShiftMin);
-  if (status === 'HALF_DAY') {
-    formattedWorktime = formatMinutesToTime(Math.round(halfDayHours * 60));
+  let standardWorkMin = standardShiftMin;
+  if (status === 'PRESENT') {
+    if (shiftRule.shiftCode === 'K6' && lateComeDurationMinutes > 0) {
+      standardWorkMin = Math.max(0, standardShiftMin - lateComeDurationMinutes);
+    }
+  } else if (status === 'HALF_DAY') {
+    if (shiftRule.shiftCode === 'K6') {
+      standardWorkMin = Math.round(workedMinutes / 60) * 60;
+    } else {
+      standardWorkMin = Math.round(halfDayHours * 60);
+    }
   } else if (status === 'ABSENT') {
-    formattedWorktime = '00:00';
+    standardWorkMin = 0;
   }
+  const formattedWorktime = formatMinutesToTime(standardWorkMin);
 
   const musterUpper = String(muster || '').toUpperCase();
 
