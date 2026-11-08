@@ -1,17 +1,17 @@
 import { AttendanceRecord, AttendanceStatus, EmployeeSummary, ShiftConfig, ShiftDefinition } from '../types/attendance';
 
 export const DEFAULT_SHIFTS: ShiftDefinition[] = [
-  { shiftCode: 'KG', shiftName: 'General Shift (KG)', shiftStart: '08:30', shiftEnd: '17:30', fullDayHours: 8, halfDayHours: 4, graceMinutes: 15, isOvernight: false },
-  { shiftCode: 'K1', shiftName: 'Morning Shift 1 (K1)', shiftStart: '06:00', shiftEnd: '14:30', fullDayHours: 8, halfDayHours: 4, graceMinutes: 15, isOvernight: false },
-  { shiftCode: 'K2', shiftName: 'Afternoon Shift 2 (K2)', shiftStart: '14:30', shiftEnd: '23:00', fullDayHours: 8, halfDayHours: 4, graceMinutes: 15, isOvernight: false },
-  { shiftCode: 'K3', shiftName: 'Night Shift 3 (K3)', shiftStart: '23:00', shiftEnd: '07:30', fullDayHours: 8, halfDayHours: 4, graceMinutes: 15, isOvernight: true },
+  { shiftCode: 'KG', shiftName: 'General Shift (KG)', shiftStart: '08:30', shiftEnd: '17:00', fullDayHours: 8.5, halfDayHours: 4, graceMinutes: 15, isOvernight: false },
+  { shiftCode: 'K1', shiftName: 'Morning Shift 1 (K1)', shiftStart: '06:00', shiftEnd: '14:00', fullDayHours: 8, halfDayHours: 4, graceMinutes: 15, isOvernight: false },
+  { shiftCode: 'K2', shiftName: 'Afternoon Shift 2 (K2)', shiftStart: '14:30', shiftEnd: '23:00', fullDayHours: 8.5, halfDayHours: 4, graceMinutes: 15, isOvernight: false },
+  { shiftCode: 'K3', shiftName: 'Night Shift 3 (K3)', shiftStart: '23:00', shiftEnd: '07:30', fullDayHours: 8.5, halfDayHours: 4, graceMinutes: 15, isOvernight: true },
   { shiftCode: 'K6', shiftName: 'Extended Night Shift (K6)', shiftStart: '18:00', shiftEnd: '06:00', fullDayHours: 11, halfDayHours: 5, graceMinutes: 15, isOvernight: true },
 ];
 
 export const DEFAULT_SHIFT_CONFIG: ShiftConfig = {
   shiftStart: '08:30',
-  shiftEnd: '17:30',
-  fullDayHours: 8,
+  shiftEnd: '17:00',
+  fullDayHours: 8.5,
   halfDayHours: 4,
   otThresholdHours: 8,
   graceMinutes: 15,
@@ -329,47 +329,59 @@ export function processAttendanceRecord(
     }
   }
 
-  // 1. Extra Time Duration (how much duration extra time worked: HH:MM)
+  // 1. Late Come Duration (how much duration employee arrived late: HH:MM)
+  let lateComeDurationMinutes = 0;
+  if (inMinutes !== null && inMinutes > shiftStartMin) {
+    lateComeDurationMinutes = inMinutes - shiftStartMin;
+  }
+  const formattedLateCome = lateComeDurationMinutes > 0 ? formatMinutesToTime(lateComeDurationMinutes) : '';
+  const isLate = lateComeDurationMinutes > graceMinutes;
+
+  // 2. Early Go Duration (how much duration employee left before shift end: HH:MM)
+  let earlyGoDurationMinutes = 0;
+  if (outMinutes !== null && outMinutes < shiftEndMin && status !== 'ABSENT') {
+    earlyGoDurationMinutes = shiftEndMin - outMinutes;
+  }
+  const formattedEarlyGo = earlyGoDurationMinutes > 0 ? formatMinutesToTime(earlyGoDurationMinutes) : '';
+  const isEarlyExit = earlyGoDurationMinutes > 0;
+
+  // 3. Late Go Duration (how much duration employee stayed after shift end: HH:MM)
+  let lateGoDurationMinutes = 0;
+  if (outMinutes !== null && outMinutes > shiftEndMin) {
+    lateGoDurationMinutes = outMinutes - shiftEndMin;
+  }
+  const formattedLateGo = lateGoDurationMinutes > 0 ? formatMinutesToTime(lateGoDurationMinutes) : '';
+
+  // 4. Extra Time Duration (how much duration extra time worked: HH:MM)
+  // Mathematical Rule verified against ground-truth HR standard:
+  // - Early Comer (inMinutes <= shiftStartMin): (shiftStartMin - inMinutes) + LateGo
+  // - Late Comer (inMinutes > shiftStartMin): LateGo (late minutes are recorded in LateCome, NOT deducted from overtime past shift end)
   let extraDurationMinutes = 0;
-  const providedExtraMin = parseTimeToMinutes(extraData?.extraTime);
-  if (providedExtraMin !== null && providedExtraMin > 0) {
-    extraDurationMinutes = providedExtraMin;
-  } else if (extraData?.overtime) {
-    const expMin = parseTimeToMinutes(extraData.overtime);
-    if (expMin !== null && expMin > 0) {
-      extraDurationMinutes = expMin;
-    }
-  } else {
-    const standardShiftMin = fullDayHours * 60;
-    if (workedMinutes > standardShiftMin) {
-      extraDurationMinutes = workedMinutes - standardShiftMin;
+  if (inMinutes !== null && outMinutes !== null) {
+    if (inMinutes <= shiftStartMin) {
+      extraDurationMinutes = (shiftStartMin - inMinutes) + lateGoDurationMinutes;
+    } else {
+      extraDurationMinutes = lateGoDurationMinutes;
     }
   }
   const formattedExtraTime = extraDurationMinutes > 0 ? formatMinutesToTime(extraDurationMinutes) : '';
 
-  // 2. Overtime Hours (OT) with Strict 1:56 Cutoff & 4-minute grace:
+  // 5. Overtime Hours (OT) with Strict 1:56 Cutoff & 4-minute grace:
   // User Rule: "then OT 1:55 erdha 0 tha varanum then 1:56 erdha 2 ..... So OT la 1hr vara kudathu mama"
   // - If extra time <= 1:55 (115 mins) -> 0 OT!
   // - If extra time >= 1:56 (116 mins) -> 2 hours OT! (No 1hr OT allowed).
   // - Each subsequent hour also qualifies 4 minutes before the full hour (e.g. 2:56 -> 3h, 3:56 -> 4h, 4:56 -> 5h).
   let overtimeHours = 0;
-
-  if (extraData?.overtime && !isNaN(Number(extraData.overtime)) && Number(extraData.overtime) > 0) {
-    const explicitVal = Math.floor(Number(extraData.overtime));
-    // If explicit number is >= 2, accept it; if < 2, it's 0 (no 1 hr OT)
-    overtimeHours = explicitVal >= 2 ? explicitVal : 0;
-  } else if (extraDurationMinutes >= 116) {
-    // 116 minutes = 1 hr 56 min. (116 + 4) / 60 = 2 hours!
+  if (extraDurationMinutes >= 116) {
     overtimeHours = Math.floor((extraDurationMinutes + 4) / 60);
   } else {
-    // Extra time < 1:56 (<= 115 minutes) -> 0 OT
     overtimeHours = 0;
   }
 
   const otMinutes = overtimeHours * 60;
   const otHours = overtimeHours;
 
-  // 3. OT Duty Resolution: "like ot time divide by 8 ... ipo 5 erdha div by 8 pana 0.625 nu varanum mama"
+  // 6. OT Duty Resolution: "like ot time divide by 8 ... ipo 5 erdha div by 8 pana 0.625 nu varanum mama"
   // User Rule: "8 hr mela pona 1 tha max 1 tha varanum"
   // - Formula: overtimeHours / 8, capped at maximum 1.0 duty per day.
   // - E.g. 2h => 0.25, 3h => 0.375, 4h => 0.5, 5h => 0.625, 6h => 0.75, 7h => 0.875, 8h+ => 1.0
@@ -378,45 +390,15 @@ export function processAttendanceRecord(
     otDuty = Number(Math.min(1.0, overtimeHours / 8).toFixed(3));
   }
 
-  // 2. Late Come Duration (how much duration employee arrived late: HH:MM)
-  let lateComeDurationMinutes = 0;
-  const providedLateComeMin = parseTimeToMinutes(extraData?.lateCome);
-  if (providedLateComeMin !== null && providedLateComeMin > 0) {
-    lateComeDurationMinutes = providedLateComeMin;
-  } else if (inMinutes !== null && inMinutes > shiftStartMin) {
-    lateComeDurationMinutes = inMinutes - shiftStartMin;
-  }
-  const formattedLateCome = lateComeDurationMinutes > 0 ? formatMinutesToTime(lateComeDurationMinutes) : '';
-  const isLate = lateComeDurationMinutes > graceMinutes;
-
-  // 3. Early Go Duration (how much duration employee left before shift end: HH:MM)
-  let earlyGoDurationMinutes = 0;
-  const providedEarlyGoMin = parseTimeToMinutes(extraData?.earlyGo);
-  if (providedEarlyGoMin !== null && providedEarlyGoMin > 0) {
-    earlyGoDurationMinutes = providedEarlyGoMin;
-  } else if (outMinutes !== null && outMinutes < shiftEndMin && status !== 'ABSENT') {
-    earlyGoDurationMinutes = shiftEndMin - outMinutes;
-  }
-  const formattedEarlyGo = earlyGoDurationMinutes > 0 ? formatMinutesToTime(earlyGoDurationMinutes) : '';
-  const isEarlyExit = earlyGoDurationMinutes > 0;
-
-  // 4. Late Go Duration (how much duration employee stayed after shift end: HH:MM)
-  let lateGoDurationMinutes = 0;
-  const providedLateGoMin = parseTimeToMinutes(extraData?.lateGo);
-  if (providedLateGoMin !== null && providedLateGoMin > 0) {
-    lateGoDurationMinutes = providedLateGoMin;
-  } else if (outMinutes !== null && outMinutes > shiftEndMin) {
-    lateGoDurationMinutes = outMinutes - shiftEndMin;
-  }
-  const formattedLateGo = lateGoDurationMinutes > 0 ? formatMinutesToTime(lateGoDurationMinutes) : '';
-
-  // Worktime formatting
-  let formattedWorktime = formatMinutesToTime(workedMinutes);
-  if (extraData?.worktime) {
-    const parsedWorkMin = parseTimeToMinutes(extraData.worktime);
-    if (parsedWorkMin !== null && parsedWorkMin > 0) {
-      formattedWorktime = formatMinutesToTime(parsedWorkMin);
-    }
+  // 7. Worktime Duration formatting:
+  // In standard HR practice, Worktime displays the standard shift duration for full day present
+  // (e.g. 08:30 for KG, 08:00 for K1/K2/K3), while extra time worked is captured in Extra Time & OT.
+  const standardShiftMin = Math.round(fullDayHours * 60);
+  let formattedWorktime = formatMinutesToTime(standardShiftMin);
+  if (status === 'HALF_DAY') {
+    formattedWorktime = formatMinutesToTime(Math.round(halfDayHours * 60));
+  } else if (status === 'ABSENT') {
+    formattedWorktime = '00:00';
   }
 
   const musterUpper = String(muster || '').toUpperCase();
