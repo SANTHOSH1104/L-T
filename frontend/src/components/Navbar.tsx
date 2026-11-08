@@ -30,7 +30,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleMobileMenu,
 }) => {
   return (
-    <header className="h-16 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-xs">
+    <header className="h-16 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 flex items-center justify-between shrink-0 sticky top-0 z-30 shadow-xs">
       {/* Left: Mobile Hamburger & Company / Shift Info */}
       <div className="flex items-center space-x-3">
         {/* Mobile Hamburger Button */}
