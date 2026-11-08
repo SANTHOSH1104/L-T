@@ -11,13 +11,10 @@ import {
   Filter,
   ArrowUpDown,
   CheckCircle2,
-  AlertTriangle,
-  IndianRupee,
   Calendar,
   ChevronLeft,
   ChevronRight,
-  Calculator,
-  RotateCcw
+  CalendarCheck
 } from 'lucide-react';
 import { EmployeeSummary, ShiftConfig } from '../types/attendance';
 import { exportOvertimeReportToExcel } from '../utils/excelParser';
@@ -28,14 +25,12 @@ interface OvertimeAnalyticsTabProps {
 }
 
 type OtTier = 'ALL' | 'HEAVY' | 'MODERATE' | 'LOW' | 'ZERO';
-type SortOption = 'OT_DESC' | 'OT_ASC' | 'PAY_DESC' | 'NAME_ASC' | 'ID_ASC';
+type SortOption = 'OT_DESC' | 'OT_ASC' | 'PAYABLE_DESC' | 'PRESENT_DESC' | 'NAME_ASC' | 'ID_ASC';
 
 export const OvertimeAnalyticsTab: React.FC<OvertimeAnalyticsTabProps> = ({
   summaries,
   config,
 }) => {
-  // Configurable hourly rate simulator
-  const [hourlyRate, setHourlyRate] = useState<number>(config.otHourlyRate || 150);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedDept, setSelectedDept] = useState<string>('ALL');
   const [selectedTier, setSelectedTier] = useState<OtTier>('ALL');
@@ -60,10 +55,11 @@ export const OvertimeAnalyticsTab: React.FC<OvertimeAnalyticsTabProps> = ({
 
   // Aggregated Department OT metrics
   const deptOtMap = useMemo(() => {
-    const map = new Map<string, { totalOtHours: number; employeeCount: number; otStaffCount: number }>();
+    const map = new Map<string, { totalOtHours: number; totalOtDuties: number; employeeCount: number; otStaffCount: number }>();
     normalizedSummaries.forEach(s => {
-      const existing = map.get(s.cleanDept) || { totalOtHours: 0, employeeCount: 0, otStaffCount: 0 };
+      const existing = map.get(s.cleanDept) || { totalOtHours: 0, totalOtDuties: 0, employeeCount: 0, otStaffCount: 0 };
       existing.totalOtHours = Number((existing.totalOtHours + s.totalOtHours).toFixed(2));
+      existing.totalOtDuties = Number((existing.totalOtDuties + (s.totalOtDuties || 0)).toFixed(2));
       existing.employeeCount += 1;
       if (s.totalOtHours > 0) existing.otStaffCount += 1;
       map.set(s.cleanDept, existing);
@@ -71,18 +67,18 @@ export const OvertimeAnalyticsTab: React.FC<OvertimeAnalyticsTabProps> = ({
     return Array.from(map.entries()).sort((a, b) => b[1].totalOtHours - a[1].totalOtHours);
   }, [normalizedSummaries]);
 
-  // Overall Company OT Totals
+  // Overall Company Attendance & OT Totals
   const totalOtHours = useMemo(() => {
     return Number(normalizedSummaries.reduce((acc, s) => acc + s.totalOtHours, 0).toFixed(1));
+  }, [normalizedSummaries]);
+
+  const totalOtDuties = useMemo(() => {
+    return Number(normalizedSummaries.reduce((acc, s) => acc + (s.totalOtDuties || 0), 0).toFixed(1));
   }, [normalizedSummaries]);
 
   const otQualifiedStaff = useMemo(() => {
     return normalizedSummaries.filter(s => s.totalOtHours > 0).length;
   }, [normalizedSummaries]);
-
-  const totalEstimatedCost = useMemo(() => {
-    return Math.round(totalOtHours * hourlyRate);
-  }, [totalOtHours, hourlyRate]);
 
   const avgOtPerWorker = useMemo(() => {
     return otQualifiedStaff > 0 ? (totalOtHours / otQualifiedStaff).toFixed(1) : '0.0';
@@ -128,12 +124,13 @@ export const OvertimeAnalyticsTab: React.FC<OvertimeAnalyticsTabProps> = ({
       .sort((a, b) => {
         if (sortBy === 'OT_DESC') return b.totalOtHours - a.totalOtHours;
         if (sortBy === 'OT_ASC') return a.totalOtHours - b.totalOtHours;
-        if (sortBy === 'PAY_DESC') return (b.totalOtHours * hourlyRate) - (a.totalOtHours * hourlyRate);
+        if (sortBy === 'PAYABLE_DESC') return b.netPayableDays - a.netPayableDays;
+        if (sortBy === 'PRESENT_DESC') return b.presentDays - a.presentDays;
         if (sortBy === 'NAME_ASC') return a.empName.localeCompare(b.empName);
         if (sortBy === 'ID_ASC') return a.empId.localeCompare(b.empId);
         return 0;
       });
-  }, [normalizedSummaries, searchQuery, selectedDept, selectedTier, sortBy, hourlyRate]);
+  }, [normalizedSummaries, searchQuery, selectedDept, selectedTier, sortBy]);
 
   // Pagination calculation
   const totalPages = pageSize === -1 ? 1 : Math.ceil(filteredEmployees.length / pageSize);
@@ -143,9 +140,9 @@ export const OvertimeAnalyticsTab: React.FC<OvertimeAnalyticsTabProps> = ({
     return filteredEmployees.slice(start, start + pageSize);
   }, [filteredEmployees, currentPage, pageSize]);
 
-  // Handle Export
+  // Handle Export (Attendance and Overtime Duty Report)
   const handleExport = () => {
-    exportOvertimeReportToExcel(filteredEmployees, hourlyRate, 'October_2026_Overtime_Audit_Report.xlsx');
+    exportOvertimeReportToExcel(filteredEmployees, 'October_2026_Overtime_Duty_Audit.xlsx');
   };
 
   return (
@@ -162,27 +159,27 @@ export const OvertimeAnalyticsTab: React.FC<OvertimeAnalyticsTabProps> = ({
               <span>100% Real MySQL Data</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
-              Overtime (OT) Intelligence & Financial Audit
+              Overtime (OT) Intelligence & Duty Audit
             </h2>
             <p className="text-xs sm:text-sm text-purple-200/80 max-w-2xl leading-relaxed">
-              Real-time overtime analytics computed from biometric punch pairs against enterprise shift policies.
-              Audits extra work duty past 8.0h, department distribution, and financial payout liability.
+              Biometric-verified overtime hours, accumulated OT duty days, and department workload breakdown.
+              Provides verified present days and overtime totals for internal payroll calculation.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 shrink-0">
             <button
               onClick={handleExport}
-              className="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all active:scale-95 cursor-pointer"
+              className="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition-all active:scale-95 cursor-pointer"
             >
               <Download className="w-4 h-4" />
-              <span>Export OT Audit (.xlsx)</span>
+              <span>Export OT Duty Audit (.xlsx)</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* 2. TOP 4 KPI CARDS: Key Overtime Metrics */}
+      {/* 2. TOP 4 KPI CARDS: Key Overtime & Duty Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Total Overtime Hours */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-purple-300 transition-all">
@@ -203,21 +200,21 @@ export const OvertimeAnalyticsTab: React.FC<OvertimeAnalyticsTabProps> = ({
           </div>
         </div>
 
-        {/* Card 2: Estimated Payout Liability */}
+        {/* Card 2: Total Overtime Duty Days */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-emerald-300 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Projected OT Payout</span>
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total OT Duty Days</span>
             <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <IndianRupee className="w-5 h-5" />
+              <CalendarCheck className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-3">
             <div className="text-2xl sm:text-3xl font-black text-emerald-700 tracking-tight font-mono">
-              ₹{totalEstimatedCost.toLocaleString('en-IN')}
+              {totalOtDuties.toLocaleString()} <span className="text-sm font-medium text-slate-500 font-sans">days</span>
             </div>
             <div className="mt-2 flex items-center space-x-1.5 text-xs text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg w-fit font-medium">
-              <Calculator className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Rate: ₹{hourlyRate} / hour (Simulated)</span>
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Accumulated OT shifts earned</span>
             </div>
           </div>
         </div>
@@ -261,70 +258,14 @@ export const OvertimeAnalyticsTab: React.FC<OvertimeAnalyticsTabProps> = ({
         </div>
       </div>
 
-      {/* 3. INTERACTIVE FINANCIAL RATE ADJUSTER & PAYOUT SIMULATOR */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center space-x-2">
-              <Calculator className="w-4 h-4 text-purple-600" />
-              <h3 className="font-bold text-slate-900 text-sm">Interactive OT Payout Rate Simulator</h3>
-            </div>
-            <p className="text-xs text-slate-500">
-              Select or enter an hourly overtime rate to project organizational payroll liability across departments.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {[100, 120, 150, 180, 200].map((rate) => (
-              <button
-                key={rate}
-                type="button"
-                onClick={() => setHourlyRate(rate)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  hourlyRate === rate
-                    ? 'bg-purple-600 text-white shadow-xs'
-                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                }`}
-              >
-                ₹{rate}/hr {rate === (config.otHourlyRate || 150) && '(Default)'}
-              </button>
-            ))}
-
-            <div className="flex items-center space-x-1.5 pl-2 border-l border-slate-200">
-              <span className="text-xs font-semibold text-slate-500">Custom:</span>
-              <div className="relative">
-                <span className="absolute left-2.5 top-1.5 text-xs font-bold text-slate-400">₹</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="1000"
-                  step="any"
-                  value={hourlyRate}
-                  onChange={(e) => setHourlyRate(Math.max(0, parseFloat(e.target.value) || 0))}
-                  className="w-20 pl-6 pr-2 py-1 text-xs font-mono font-bold rounded-lg border border-slate-300 focus:border-purple-500 outline-none"
-                />
-              </div>
-              <button
-                type="button"
-                title="Reset to default config rate"
-                onClick={() => setHourlyRate(config.otHourlyRate || 150)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. DEPARTMENT BREAKDOWN & TOP TIERS PREVIEW */}
+      {/* 3. DEPARTMENT BREAKDOWN & TOP TIERS PREVIEW */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Department Breakdown (2 cols on lg) */}
         <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div className="flex items-center space-x-2">
               <Building2 className="w-4 h-4 text-indigo-600" />
-              <h3 className="font-bold text-slate-800 text-sm">Department Overtime Breakdown</h3>
+              <h3 className="font-bold text-slate-800 text-sm">Department Overtime & Duty Breakdown</h3>
             </div>
             <span className="text-xs text-slate-500 font-mono">
               {deptOtMap.length} Department{deptOtMap.length > 1 ? 's' : ''}
@@ -335,7 +276,6 @@ export const OvertimeAnalyticsTab: React.FC<OvertimeAnalyticsTabProps> = ({
             {deptOtMap.map(([dept, data]) => {
               const pct = totalOtHours > 0 ? Math.round((data.totalOtHours / totalOtHours) * 100) : 0;
               const avgDeptOt = data.otStaffCount > 0 ? (data.totalOtHours / data.otStaffCount).toFixed(1) : '0.0';
-              const deptCost = Math.round(data.totalOtHours * hourlyRate);
 
               return (
                 <div key={dept} className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-2.5">
@@ -343,7 +283,7 @@ export const OvertimeAnalyticsTab: React.FC<OvertimeAnalyticsTabProps> = ({
                     <div className="flex items-center space-x-2">
                       <span className="font-bold text-slate-900 text-sm">{dept}</span>
                       <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 text-[10px] font-bold">
-                        {data.otStaffCount} / {data.employeeCount} Staff OT
+                        {data.otStaffCount} / {data.employeeCount} Staff Logged OT
                       </span>
                     </div>
                     <div className="text-right">
@@ -363,7 +303,7 @@ export const OvertimeAnalyticsTab: React.FC<OvertimeAnalyticsTabProps> = ({
 
                   <div className="flex justify-between items-center text-[11px] text-slate-500">
                     <span className="font-mono font-medium">Avg: {avgDeptOt} hrs / OT worker</span>
-                    <span className="font-mono font-bold text-emerald-700">Est. Pay: ₹{deptCost.toLocaleString('en-IN')}</span>
+                    <span className="font-mono font-bold text-emerald-700">Accumulated OT: {data.totalOtDuties} Duty Days</span>
                   </div>
                 </div>
               );
@@ -398,7 +338,7 @@ export const OvertimeAnalyticsTab: React.FC<OvertimeAnalyticsTabProps> = ({
                   {tierCounts.heavy} Staff
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 mt-1">High fatigue risk • Priority payroll audit</p>
+              <p className="text-[11px] text-slate-500 mt-1">High workload • Priority duty verification</p>
             </button>
 
             {/* Moderate OT */}
@@ -417,7 +357,7 @@ export const OvertimeAnalyticsTab: React.FC<OvertimeAnalyticsTabProps> = ({
                   {tierCounts.moderate} Staff
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 mt-1">Steady overtime contribution</p>
+              <p className="text-[11px] text-slate-500 mt-1">Regular overtime contribution</p>
             </button>
 
             {/* Low OT */}
@@ -461,20 +401,20 @@ export const OvertimeAnalyticsTab: React.FC<OvertimeAnalyticsTabProps> = ({
         </div>
       </div>
 
-      {/* 5. AUDIT DATA TABLE: Filters, Search, and Employee Breakdown */}
+      {/* 4. AUDIT DATA TABLE: Filters, Search, and Employee Breakdown */}
       <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
         {/* Table Toolbar */}
         <div className="p-4 sm:p-5 border-b border-slate-100 space-y-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
               <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-                Detailed Employee Overtime Audit
+                Detailed Employee Overtime & Attendance Ledger
                 <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 font-mono font-bold">
                   {filteredEmployees.length} Results
                 </span>
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Full ledger of overtime hours, duty days, and individual projected payroll payouts.
+                Verified ledger of Present Days, Net Payable Days, and Overtime Hours ready for internal salary processing.
               </p>
             </div>
 
@@ -577,7 +517,8 @@ export const OvertimeAnalyticsTab: React.FC<OvertimeAnalyticsTabProps> = ({
               >
                 <option value="OT_DESC">Sort: Overtime (High to Low)</option>
                 <option value="OT_ASC">Sort: Overtime (Low to High)</option>
-                <option value="PAY_DESC">Sort: Estimated Pay (High to Low)</option>
+                <option value="PAYABLE_DESC">Sort: Net Payable Days (High to Low)</option>
+                <option value="PRESENT_DESC">Sort: Present Days (High to Low)</option>
                 <option value="NAME_ASC">Sort: Employee Name (A-Z)</option>
                 <option value="ID_ASC">Sort: Employee ID (A-Z)</option>
               </select>
@@ -609,11 +550,11 @@ export const OvertimeAnalyticsTab: React.FC<OvertimeAnalyticsTabProps> = ({
                 <th className="py-3 px-3 text-center w-12"># Rank</th>
                 <th className="py-3 px-4 sticky left-0 bg-slate-50 z-10 shadow-xs">Employee Details</th>
                 <th className="py-3 px-3">Department</th>
-                <th className="py-3 px-3 text-center">Present Days</th>
+                <th className="py-3 px-3 text-center font-bold text-slate-800">Present Days</th>
                 <th className="py-3 px-3 text-right">Work Hours</th>
                 <th className="py-3 px-3 text-right font-black text-purple-900">Total OT Hours</th>
                 <th className="py-3 px-3 text-center">OT Duty Days</th>
-                <th className="py-3 px-3 text-right font-black text-emerald-900">Est. OT Pay (₹)</th>
+                <th className="py-3 px-3 text-right font-black text-emerald-800">Net Payable Days</th>
                 <th className="py-3 px-3 text-center">Status Tier</th>
               </tr>
             </thead>
@@ -631,7 +572,6 @@ export const OvertimeAnalyticsTab: React.FC<OvertimeAnalyticsTabProps> = ({
               ) : (
                 paginatedEmployees.map((emp, idx) => {
                   const globalRank = (pageSize === -1 ? 0 : (currentPage - 1) * pageSize) + idx + 1;
-                  const estPay = Math.round(emp.totalOtHours * hourlyRate);
 
                   // Tier badge styling
                   let tierBadge = (
@@ -719,9 +659,9 @@ export const OvertimeAnalyticsTab: React.FC<OvertimeAnalyticsTabProps> = ({
                         )}
                       </td>
 
-                      {/* Estimated OT Pay */}
-                      <td className="py-3 px-3 text-right font-mono font-extrabold text-sm text-emerald-700">
-                        {estPay > 0 ? `₹${estPay.toLocaleString('en-IN')}` : <span className="text-slate-300 font-normal">₹0</span>}
+                      {/* Net Payable Days (Ready for internal salary calculation!) */}
+                      <td className="py-3 px-3 text-right font-mono font-black text-sm text-emerald-800">
+                        {emp.netPayableDays.toFixed(1)} Days
                       </td>
 
                       {/* Status Tier */}

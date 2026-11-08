@@ -226,6 +226,7 @@ export function exportAttendanceToExcel(records: AttendanceRecord[], filename = 
   saveAs(blob, filename);
 }
 
+
 /**
  * Export monthly payroll summary to Excel (.xlsx)
  */
@@ -257,17 +258,16 @@ export function exportPayrollSummaryToExcel(summaries: EmployeeSummary[], filena
 }
 
 /**
- * Export detailed Overtime (OT) Audit Report to Excel (.xlsx)
+ * Export detailed Overtime (OT) Duty Audit Report to Excel (.xlsx)
+ * Pure attendance and duty hours export without monetary amounts.
  */
 export function exportOvertimeReportToExcel(
   summaries: EmployeeSummary[],
-  hourlyRate: number = 150,
-  filename = 'Overtime_Audit_Report.xlsx'
+  filename = 'Overtime_Duty_Audit_Report.xlsx'
 ) {
   const exportData = [...summaries]
     .sort((a, b) => b.totalOtHours - a.totalOtHours)
     .map((s, index) => {
-      const estOtPay = Math.round(s.totalOtHours * hourlyRate);
       let otCategory = 'Zero Overtime';
       if (s.totalOtHours >= 50) otCategory = 'Heavy Overtime (> 50h)';
       else if (s.totalOtHours >= 20) otCategory = 'Moderate Overtime (20-50h)';
@@ -279,18 +279,17 @@ export function exportOvertimeReportToExcel(
         'Employee Name': s.empName,
         'Department': (s.department || 'GENERAL').trim().toUpperCase(),
         'Present Days': s.presentDays,
-        'Total Regular Work Hours': s.totalWorkHours,
+        'Total Work Hours': s.totalWorkHours,
         'Total OT Hours': s.totalOtHours,
-        'Hourly OT Rate (INR)': hourlyRate,
-        'Estimated OT Pay (INR)': estOtPay,
-        'OT Category': otCategory,
+        'OT Duty Days': s.totalOtDuties ?? 0,
         'Net Payable Days': s.netPayableDays,
+        'OT Category': otCategory,
       };
     });
 
   const worksheet = XLSX.utils.json_to_sheet(exportData);
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'OT Audit Report');
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'OT Duty Audit');
 
   const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
   const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
