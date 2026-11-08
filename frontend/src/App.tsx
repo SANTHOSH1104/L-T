@@ -104,8 +104,8 @@ export function App() {
 
   // 2. DASHBOARD: Authenticated Admin Portal with REAL Backend Data
   return (
-    <div className="flex min-h-screen bg-slate-50/50 text-slate-900 antialiased font-sans">
-      {/* Sidebar with Desktop & Mobile Drawer capability */}
+    <div className="flex h-screen w-screen overflow-hidden bg-slate-50/50 text-slate-900 antialiased font-sans">
+      {/* Left Sidebar: Fixed / Locked to screen height with independent menu scroll */}
       <Sidebar
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
@@ -115,8 +115,8 @@ export function App() {
         onCloseMobile={() => setIsMobileMenuOpen(false)}
       />
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+      {/* Right Main Column: Fixed full height, independent content scroll */}
+      <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
         <Navbar
           config={config}
           admin={adminUser}
@@ -125,7 +125,9 @@ export function App() {
           onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         />
 
-        <main className="p-4 sm:p-6 md:p-8 max-w-7xl w-full mx-auto flex-1 space-y-6">
+        {/* Dedicated Independent Scroll Container for Right-side Content */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
+          <main className="p-4 sm:p-6 md:p-8 max-w-7xl w-full mx-auto space-y-6">
           {isLoadingData ? (
             <div className="space-y-6 py-2">
               {/* Shimmer Skeleton Dashboard during data fetch */}
@@ -199,6 +201,7 @@ export function App() {
             </>
           )}
         </main>
+        </div>
       </div>
     </div>
   );

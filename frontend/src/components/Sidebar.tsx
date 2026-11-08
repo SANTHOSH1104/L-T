@@ -55,9 +55,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const sidebarContent = (
-    <div className="flex flex-col h-full bg-slate-900 text-slate-300 border-r border-slate-800/80 select-none">
+    <div className="flex flex-col h-full w-full bg-slate-900 text-slate-300 border-r border-slate-800/80 select-none overflow-hidden">
       {/* Brand Header */}
-      <div className="p-5 border-b border-slate-800/80 flex items-center justify-between">
+      <div className="p-5 border-b border-slate-800/80 flex items-center justify-between shrink-0">
         <div className="flex items-center space-x-3">
           <div className="relative w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 via-blue-600 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/20">
             <span className="font-extrabold text-lg tracking-wider">M</span>
@@ -83,7 +83,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Company / Shift Quick Card */}
-      <div className="mx-4 my-3 p-3 bg-gradient-to-br from-slate-800/90 to-slate-800/40 rounded-xl border border-slate-700/50 shadow-inner text-xs space-y-1.5">
+      <div className="mx-4 my-3 p-3 bg-gradient-to-br from-slate-800/90 to-slate-800/40 rounded-xl border border-slate-700/50 shadow-inner text-xs space-y-1.5 shrink-0">
         <div className="flex items-center justify-between text-slate-400">
           <div className="flex items-center min-w-0 mr-2">
             <Building2 className="w-3.5 h-3.5 mr-1.5 text-indigo-400 shrink-0" />
@@ -143,7 +143,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </nav>
 
       {/* Footer Info & Engine Status */}
-      <div className="p-4 border-t border-slate-800/80 text-xs text-slate-500 bg-slate-900/60">
+      <div className="p-4 border-t border-slate-800/80 text-xs text-slate-500 bg-slate-900/60 shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-1.5 text-emerald-400 font-medium">
             <CheckCircle2 className="w-3.5 h-3.5" />
@@ -160,8 +160,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <>
-      {/* Desktop Persistent Sidebar */}
-      <aside className="hidden lg:flex w-64 shrink-0 min-h-screen">
+      {/* Desktop Persistent Sidebar - 100% Fixed and Independent */}
+      <aside className="hidden lg:flex w-64 shrink-0 h-screen sticky top-0 overflow-hidden">
         {sidebarContent}
       </aside>
 
