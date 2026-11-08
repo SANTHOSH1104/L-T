@@ -165,35 +165,18 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                Company / Organization Name <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={formData.companyName}
-                onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-                required
-                className="w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-300 bg-slate-50/70 focus:bg-white focus:border-indigo-500 outline-none font-semibold text-slate-800 transition-all"
-                placeholder="e.g. Macha Enterprise Solutions"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                Overtime Hourly Payout Rate (₹ / Hour)
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="any"
-                value={formData.otHourlyRate ?? 150}
-                onChange={(e) => setFormData({ ...formData, otHourlyRate: parseFloat(e.target.value) || 0 })}
-                className="w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-300 bg-slate-50/70 focus:bg-white focus:border-indigo-500 outline-none font-mono font-bold text-purple-700 transition-all"
-                placeholder="150"
-              />
-            </div>
+          <div className="max-w-xl">
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              Company / Organization Name <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.companyName}
+              onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+              required
+              className="w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-300 bg-slate-50/70 focus:bg-white focus:border-indigo-500 outline-none font-semibold text-slate-800 transition-all"
+              placeholder="e.g. Macha Enterprise Solutions"
+            />
           </div>
         </div>
 

@@ -434,7 +434,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                   <th className="py-2.5 px-3">Dept</th>
                   <th className="py-2.5 px-3 text-center">Present Days</th>
                   <th className="py-2.5 px-3 text-center">OT Hours</th>
-                  <th className="py-2.5 px-3 text-right rounded-r-xl">Est. Pay</th>
+                  <th className="py-2.5 px-3 text-right rounded-r-xl">Net Payable</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -454,7 +454,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                       </span>
                     </td>
                     <td className="py-2.5 px-3 text-right font-bold text-emerald-700 font-mono">
-                      ₹{emp.estimatedOtPay.toLocaleString('en-IN')}
+                      {emp.netPayableDays.toFixed(1)} Days
                     </td>
                   </tr>
                 ))}
