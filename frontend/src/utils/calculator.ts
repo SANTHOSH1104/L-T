@@ -4,7 +4,7 @@ export const DEFAULT_SHIFTS: ShiftDefinition[] = [
   { shiftCode: 'KG', shiftName: 'General Shift (KG)', shiftStart: '08:30', shiftEnd: '17:00', fullDayHours: 8.5, halfDayHours: 4, graceMinutes: 15, isOvernight: false },
   { shiftCode: 'K1', shiftName: 'Morning Shift 1 (K1)', shiftStart: '06:00', shiftEnd: '14:00', fullDayHours: 8, halfDayHours: 4, graceMinutes: 15, isOvernight: false },
   { shiftCode: 'K2', shiftName: 'Afternoon Shift 2 (K2)', shiftStart: '14:30', shiftEnd: '23:00', fullDayHours: 8.5, halfDayHours: 4, graceMinutes: 15, isOvernight: false },
-  { shiftCode: 'K3', shiftName: 'Night Shift 3 (K3)', shiftStart: '23:00', shiftEnd: '07:30', fullDayHours: 8.5, halfDayHours: 4, graceMinutes: 15, isOvernight: true },
+  { shiftCode: 'K3', shiftName: 'Night Shift 3 (K3)', shiftStart: '23:00', shiftEnd: '06:00', fullDayHours: 7, halfDayHours: 3.5, graceMinutes: 15, isOvernight: true },
   { shiftCode: 'K6', shiftName: 'Extended Night Shift (K6)', shiftStart: '18:00', shiftEnd: '02:00', fullDayHours: 8, halfDayHours: 4, graceMinutes: 15, isOvernight: true },
 ];
 
