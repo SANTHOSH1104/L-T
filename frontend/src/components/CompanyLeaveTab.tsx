@@ -367,9 +367,19 @@ export const CompanyLeaveTab: React.FC<CompanyLeaveTabProps> = ({ config, onRefr
         </div>
 
         {isLoading ? (
-          <div className="p-12 text-center text-slate-400">
-            <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-            Loading holidays from database...
+          <div className="p-4 space-y-3">
+            {[1, 2, 3, 4].map((item) => (
+              <div key={item} className="p-4 rounded-xl bg-slate-50/70 border border-slate-100 flex items-center justify-between animate-pulse">
+                <div className="flex items-center space-x-4">
+                  <div className="w-14 h-14 rounded-xl bg-slate-200"></div>
+                  <div className="space-y-2">
+                    <div className="w-44 h-4 bg-slate-200 rounded-md"></div>
+                    <div className="w-64 h-3 bg-slate-100 rounded-md"></div>
+                  </div>
+                </div>
+                <div className="w-8 h-8 rounded-lg bg-slate-200"></div>
+              </div>
+            ))}
           </div>
         ) : holidays.length === 0 ? (
           <div className="p-12 text-center space-y-2">
