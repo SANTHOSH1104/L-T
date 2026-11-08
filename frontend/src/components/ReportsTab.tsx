@@ -135,13 +135,22 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
           return false;
         }
 
-        // Search query
+        // Search query: supports single name/ID, or multiple separated by comma, semicolon, slash, pipe, or newline (Excel paste)
         if (searchQuery.trim()) {
-          const q = searchQuery.toLowerCase();
-          const matchName = emp.empName.toLowerCase().includes(q);
-          const matchId = emp.empId.toLowerCase().includes(q);
-          const matchDept = (emp.department || '').toLowerCase().includes(q);
-          if (!matchName && !matchId && !matchDept) return false;
+          const tokens = searchQuery
+            .split(/[,;/|\n]+/)
+            .map(t => t.trim().toLowerCase())
+            .filter(Boolean);
+
+          if (tokens.length > 0) {
+            const matchesAnyToken = tokens.some(token => {
+              const matchName = emp.empName.toLowerCase().includes(token);
+              const matchId = emp.empId.toLowerCase().includes(token);
+              const matchDept = (emp.department || '').toLowerCase().includes(token);
+              return matchName || matchId || matchDept;
+            });
+            if (!matchesAnyToken) return false;
+          }
         }
 
         // Department filter
@@ -207,6 +216,21 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
   const handleClearAllSelections = () => {
     setSelectedEmpIds([]);
     setShowOnlySelected(false);
+  };
+
+  // Search match selection helpers
+  const areAllSearchMatchesSelected = useMemo(() => {
+    if (!searchQuery.trim() || filteredAndSortedEmployees.length === 0) return false;
+    return filteredAndSortedEmployees.every(emp => selectedEmpIds.includes(emp.empId));
+  }, [searchQuery, filteredAndSortedEmployees, selectedEmpIds]);
+
+  const handleToggleSelectSearchMatches = () => {
+    const matchIds = filteredAndSortedEmployees.map(e => e.empId);
+    if (areAllSearchMatchesSelected) {
+      setSelectedEmpIds(prev => prev.filter(id => !matchIds.includes(id)));
+    } else {
+      setSelectedEmpIds(prev => Array.from(new Set([...prev, ...matchIds])));
+    }
   };
 
   // Generated File Name Preview
@@ -564,12 +588,48 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               <input
                 type="text"
-                placeholder="Search by Name or Emp ID to select or find staff..."
+                placeholder="Search single or multiple (e.g. Siluvai, Dhanan or 101, 102)..."
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 outline-none transition-all"
+                className="w-full pl-9 pr-8 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 outline-none transition-all"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => { setSearchQuery(''); setCurrentPage(1); }}
+                  title="Clear search text (selected staff stay selected)"
+                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
+
+            {/* Quick Action: Select All / Deselect All Found in Search */}
+            {searchQuery.trim() && filteredAndSortedEmployees.length > 0 && (
+              <button
+                type="button"
+                onClick={handleToggleSelectSearchMatches}
+                className={`inline-flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs shrink-0 ${
+                  areAllSearchMatchesSelected
+                    ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                }`}
+                title={areAllSearchMatchesSelected ? 'Deselect all matching employees' : 'Select all matching employees'}
+              >
+                {areAllSearchMatchesSelected ? (
+                  <>
+                    <Square className="w-3.5 h-3.5" />
+                    <span>Deselect {filteredAndSortedEmployees.length} Found</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Select All {filteredAndSortedEmployees.length} Found</span>
+                  </>
+                )}
+              </button>
+            )}
 
             {/* Department Filter */}
             <div className="relative w-full sm:w-56">
@@ -627,6 +687,23 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
               <span>Export {selectedEmpIds.length > 0 ? `Selected (${selectedEmpIds.length})` : 'All'}</span>
             </button>
           </div>
+        </div>
+
+        {/* Multi-Search Helpful Guidance & Found Badge */}
+        <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-500 bg-slate-50/80 px-3 py-2 rounded-xl border border-slate-100 gap-2">
+          <div className="flex items-center space-x-2">
+            <span className="font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200 shrink-0">
+              💡 Multi-Search:
+            </span>
+            <span>
+              Type multiple names or IDs with comma (e.g. <strong className="text-indigo-900 font-mono">Siluvai, Dhanan</strong> or <strong className="text-indigo-900 font-mono">101, 102</strong>) or paste IDs from Excel!
+            </span>
+          </div>
+          {searchQuery.trim() && (
+            <div className="flex items-center space-x-1.5 text-xs font-bold text-indigo-800 bg-indigo-100/70 px-2.5 py-0.5 rounded-full border border-indigo-200 shrink-0">
+              <span>{filteredAndSortedEmployees.length} Matching Staff Found</span>
+            </div>
+          )}
         </div>
 
         {/* Selected Staff Tags (Visual preview when employees are selected) */}
