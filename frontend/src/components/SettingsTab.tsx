@@ -152,7 +152,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       )}
 
       {/* Main Form */}
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} noValidate className="space-y-6">
         {/* CARD 1: Organization & Primary Company Identity */}
         <div className="bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-6 shadow-xs space-y-4">
           <div className="flex items-center space-x-3 border-b border-slate-100 pb-3">

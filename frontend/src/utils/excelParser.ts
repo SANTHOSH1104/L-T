@@ -257,6 +257,48 @@ export function exportPayrollSummaryToExcel(summaries: EmployeeSummary[], filena
 }
 
 /**
+ * Export detailed Overtime (OT) Audit Report to Excel (.xlsx)
+ */
+export function exportOvertimeReportToExcel(
+  summaries: EmployeeSummary[],
+  hourlyRate: number = 150,
+  filename = 'Overtime_Audit_Report.xlsx'
+) {
+  const exportData = [...summaries]
+    .sort((a, b) => b.totalOtHours - a.totalOtHours)
+    .map((s, index) => {
+      const estOtPay = Math.round(s.totalOtHours * hourlyRate);
+      let otCategory = 'Zero Overtime';
+      if (s.totalOtHours >= 50) otCategory = 'Heavy Overtime (> 50h)';
+      else if (s.totalOtHours >= 20) otCategory = 'Moderate Overtime (20-50h)';
+      else if (s.totalOtHours > 0) otCategory = 'Low Overtime (1-20h)';
+
+      return {
+        'Rank': index + 1,
+        'Employee ID': s.empId,
+        'Employee Name': s.empName,
+        'Department': (s.department || 'GENERAL').trim().toUpperCase(),
+        'Present Days': s.presentDays,
+        'Total Regular Work Hours': s.totalWorkHours,
+        'Total OT Hours': s.totalOtHours,
+        'Hourly OT Rate (INR)': hourlyRate,
+        'Estimated OT Pay (INR)': estOtPay,
+        'OT Category': otCategory,
+        'Net Payable Days': s.netPayableDays,
+      };
+    });
+
+  const worksheet = XLSX.utils.json_to_sheet(exportData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'OT Audit Report');
+
+  const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  saveAs(blob, filename);
+}
+
+
+/**
  * Generate a ready-to-test sample Excel file for the client
  */
 export function downloadSampleExcelTemplate() {
