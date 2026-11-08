@@ -187,11 +187,6 @@ export const saveShiftPolicy = async (req: Request, res: Response): Promise<void
         {
           shift: r.shift,
           muster: r.muster,
-          worktime: r.worktime,
-          extraTime: r.extraTime,
-          lateCome: r.lateCome,
-          earlyGo: r.earlyGo,
-          lateGo: r.lateGo,
         }
       );
 
@@ -389,7 +384,8 @@ export const updatePunchRecord = async (req: Request, res: Response): Promise<vo
       existing.date,
       inTime,
       outTime,
-      config
+      config,
+      { shift: existing.shift, muster: existing.muster }
     );
 
     await runQuery(`
