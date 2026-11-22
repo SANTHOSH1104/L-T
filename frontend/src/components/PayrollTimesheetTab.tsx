@@ -158,26 +158,25 @@ export const PayrollTimesheetTab: React.FC<PayrollTimesheetTabProps> = ({
               <tr>
                 <th className="py-3 px-4 sticky left-0 bg-slate-50 z-20 shadow-xs border-r border-slate-200 min-w-[170px]">Employee</th>
                 <th className="py-3 px-3">Dept</th>
-                <th className="py-3 px-2 text-center text-slate-700" title="Month Standard Working Days (Excluding Sundays & Holidays)">Month Days</th>
-                <th className="py-3 px-2 text-center text-emerald-700" title="Actual Days Attended on Working Days">Actual Present</th>
+                <th className="py-3 px-2 text-center text-slate-700" title="Month Standard Working Days (Excluding Sundays & Holidays)">Working day</th>
+                <th className="py-3 px-2 text-center text-emerald-700" title="Actual Days Attended on Working Days">Present</th>
+                <th className="py-3 px-2 text-center text-purple-700" title="Total Accumulated OT Duties (Days)">OT</th>
                 <th className="py-3 px-2 text-center text-rose-600" title="Absent on Working Days">Absent</th>
-                <th className="py-3 px-2 text-center text-amber-600 font-bold bg-amber-50/40" title="Compensatory Off Days Adjusted from OT">Comp-Off</th>
-                <th className="py-3 px-2 text-center text-emerald-800 font-bold bg-emerald-50/40" title="Final Effective Work Days (Present + Comp-Off)">Final Work</th>
-                <th className="py-3 px-2 text-center text-purple-700" title="Total Accumulated OT Duties (Days)">Total OT</th>
-                <th className="py-3 px-2 text-center text-purple-900 font-bold bg-purple-50/50" title="Remaining OT Duties to be Paid">Paid OT</th>
-                <th className="py-3 px-2 text-center text-indigo-600">Sunday</th>
+                <th className="py-3 px-2 text-center text-indigo-600">sunday/off</th>
                 <th className="py-3 px-2 text-center text-teal-600">Holiday</th>
+                <th className="py-3 px-2 text-center text-amber-600 font-bold bg-amber-50/40" title="Compensatory Off Days Adjusted from OT">compooff</th>
+                <th className="py-3 px-2 text-center text-emerald-800 font-bold bg-emerald-50/40" title="Final Effective Work Days (Present + Comp-Off)">total work paid</th>
+                <th className="py-3 px-2 text-center text-purple-900 font-bold bg-purple-50/50" title="Remaining OT Duties to be Paid">OT paid</th>
                 <th className="py-3 px-3 text-center bg-emerald-100/60 font-black text-emerald-900">
-                  Payable Days
+                  Total Payable Days
                 </th>
-                <th className="py-3 px-2 text-center font-mono">Work Hours</th>
                 <th className="py-3 px-3 text-center rounded-r-lg">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredAndSorted.length === 0 ? (
                 <tr>
-                  <td colSpan={14} className="text-center py-8 text-slate-400">
+                  <td colSpan={13} className="text-center py-8 text-slate-400">
                     No employee summaries available.
                   </td>
                 </tr>
@@ -192,7 +191,12 @@ export const PayrollTimesheetTab: React.FC<PayrollTimesheetTabProps> = ({
                       <td className="py-3 px-3 text-slate-600">{s.department}</td>
                       <td className="py-3 px-2 text-center font-mono font-bold text-slate-700">{s.monthWorkingDays ?? s.totalDays}</td>
                       <td className="py-3 px-2 text-center font-mono font-bold text-emerald-700">{s.actualPresentDays ?? s.totalOnDuty ?? s.presentDays}</td>
+                      <td className="py-3 px-2 text-center font-mono font-medium text-purple-700">
+                        {s.totalOtDuties !== undefined ? `${s.totalOtDuties}` : '0'}
+                      </td>
                       <td className="py-3 px-2 text-center font-mono font-semibold text-rose-600">{s.monthAbsentDays ?? s.absentDays}</td>
+                      <td className="py-3 px-2 text-center font-mono font-medium text-indigo-700">{s.totalSundays || 0}</td>
+                      <td className="py-3 px-2 text-center font-mono font-medium text-teal-700">{s.totalHolidays || 0}</td>
                       <td className="py-3 px-2 text-center font-mono font-bold text-amber-600 bg-amber-50/30">
                         {s.compOffDays && s.compOffDays > 0 ? (
                           <span className="inline-block px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[11px]">
@@ -203,18 +207,12 @@ export const PayrollTimesheetTab: React.FC<PayrollTimesheetTabProps> = ({
                       <td className="py-3 px-2 text-center font-mono font-extrabold text-emerald-800 bg-emerald-50/30">
                         {s.finalWorkDays ?? (s.totalOnDuty ?? s.presentDays)}
                       </td>
-                      <td className="py-3 px-2 text-center font-mono font-medium text-purple-700">
-                        {s.totalOtDuties !== undefined ? `${s.totalOtDuties}d` : '0d'}
-                      </td>
                       <td className="py-3 px-2 text-center font-mono font-bold text-purple-900 bg-purple-50/30">
-                        {s.paidOtDuties !== undefined ? `${s.paidOtDuties}d` : '0d'}
+                        {s.paidOtDuties !== undefined ? `${s.paidOtDuties}` : '0'}
                       </td>
-                      <td className="py-3 px-2 text-center font-mono font-medium text-indigo-700">{s.totalSundays || 0}</td>
-                      <td className="py-3 px-2 text-center font-mono font-medium text-teal-700">{s.totalHolidays || 0}</td>
                       <td className="py-3 px-3 text-center font-mono font-black text-emerald-900 bg-emerald-100/50">
-                        {Number(s.netPayableDays.toFixed(3))}
+                        {s.netPayableDays}
                       </td>
-                      <td className="py-3 px-2 text-center font-mono text-slate-600">{formatHours(s.totalWorkHours)}</td>
                       <td className="py-3 px-3 text-center">
                         <Button
                           variant="ghost"
