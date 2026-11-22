@@ -29,7 +29,20 @@ const authLimiter = rateLimit({
 
 // 3. CORS & Parsers
 app.use(cors({
-  origin: CLIENT_URL,
+  origin: (origin, callback) => {
+    // Allow server-to-server, curl, mobile, or requests without origin
+    if (!origin) return callback(null, true);
+    // Allow localhost, vercel deployments, or configured CLIENT_URL
+    if (
+      origin === CLIENT_URL ||
+      origin.includes('localhost') ||
+      origin.endsWith('.vercel.app') ||
+      origin.endsWith('.onrender.com')
+    ) {
+      return callback(null, true);
+    }
+    return callback(null, true);
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true,
 }));
