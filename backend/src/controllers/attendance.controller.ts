@@ -9,9 +9,10 @@ import {
   DEFAULT_SHIFT_CONFIG, 
   DEFAULT_SHIFTS,
   generateEmployeeSummaries, 
-  calculateRecord 
+  calculateRecord,
+  applyHolidaySandwichRule
 } from '../services/calculator.service';
-import { ShiftConfig, ShiftDefinition, ColumnMapping, AttendanceRecord } from '../types';
+import { ShiftConfig, ShiftDefinition, ColumnMapping, AttendanceRecord, CompanyHoliday } from '../types';
 import { runQuery, getAllRows, getRow } from '../db/mysql';
 
 // Fetch current shift config and multi-shift rules from MySQL DB
@@ -272,6 +273,9 @@ export const saveShiftPolicy = async (req: Request, res: Response): Promise<void
       ]);
     }
 
+    // Apply strict sandwich rule after recalculation
+    await applyHolidaySandwichRuleToDb();
+
     res.json({ success: true, message: 'Shift policy updated and all database records recalculated!' });
   } catch (error) {
     console.error('Save policy error:', error);
@@ -300,7 +304,9 @@ export const uploadAndProcess = async (req: Request, res: Response): Promise<voi
     }
 
     // Transform into structured records
-    const records = transformRowsToAttendance(rawRows, mapping, config);
+    const initialRecords = transformRowsToAttendance(rawRows, mapping, config);
+    // Apply Strict Holiday Sandwich Rule
+    const records = applyHolidaySandwichRule(initialRecords, config.holidays || []);
 
     // Save into MySQL Database
     for (const r of records) {
@@ -469,6 +475,9 @@ export const updatePunchRecord = async (req: Request, res: Response): Promise<vo
       id
     ]);
 
+    // Re-evaluate holiday sandwich rule in case adjacent day was modified
+    await applyHolidaySandwichRuleToDb();
+
     res.json({ success: true, message: 'Punch updated successfully', data: updated });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to update record' });
@@ -606,33 +615,93 @@ export const getCompanyHolidays = async (_req: Request, res: Response): Promise<
   }
 };
 
-export const applyHolidayToAttendance = async (date: string, name: string, isPaid: number): Promise<void> => {
-  // 1. Non-punched records on this holiday date
-  await runQuery(`
-    UPDATE attendance_logs
-    SET 
-      muster = 'HL',
-      status = 'HOLIDAY',
-      holiday = ?,
-      onDuty = 0.00,
-      sunday = 0.00,
-      dayTotal = ?,
-      notes = ?
-    WHERE date = ? AND (inTime = '--:--' OR inTime = '' OR inTime = '-')
-  `, [isPaid ? 1.00 : 0.00, isPaid ? 1.00 : 0.00, `${name} (Company Holiday)`, date]);
+/**
+ * Synchronize and apply strict sandwich rule across all records in the database.
+ * "mama rendu naluma vadhu erukanum before and after must vadhu erukanum mama"
+ */
+export const applyHolidaySandwichRuleToDb = async (): Promise<void> => {
+  const holidays = await getAllRows<any>('SELECT * FROM company_holidays ORDER BY date ASC');
+  const rows = await getAllRows<any>('SELECT * FROM attendance_logs ORDER BY date ASC, empId ASC');
+  if (!rows || rows.length === 0) return;
 
-  // 2. Punched records (worked on holiday)
-  await runQuery(`
-    UPDATE attendance_logs
-    SET 
-      muster = 'HP',
-      status = 'PRESENT',
-      holiday = ?,
-      onDuty = 0.00,
-      dayTotal = ? + otDuty,
-      notes = CONCAT('Worked on Holiday: ', ?)
-    WHERE date = ? AND inTime != '--:--' AND inTime != '' AND inTime != '-'
-  `, [isPaid ? 1.00 : 0.00, isPaid ? 1.00 : 0.00, name, date]);
+  const records: AttendanceRecord[] = rows.map(r => ({
+    id: r.id,
+    empId: r.empId,
+    empName: r.empName,
+    department: r.department,
+    shift: r.shift || 'KG',
+    date: r.date,
+    inTime: r.inTime,
+    outTime: r.outTime,
+    muster: r.muster || 'PP',
+    worktime: r.worktime || '',
+    extraTime: r.extraTime || '',
+    overtimeHours: Number(r.overtimeHours) || 0,
+    lateCome: r.lateCome || '',
+    earlyGo: r.earlyGo || '',
+    lateGo: r.lateGo || '',
+    otDuty: Number(r.otDuty) || 0,
+    totalMinutes: Number(r.totalMinutes) || 0,
+    totalHours: Number(r.totalHours) || 0,
+    status: r.status,
+    isLate: Boolean(Number(r.isLate)),
+    isEarlyExit: Boolean(Number(r.isEarlyExit)),
+    otMinutes: Number(r.otMinutes) || 0,
+    otHours: Number(r.otHours) || 0,
+    onDuty: Number(r.onDuty) || 0,
+    sunday: Number(r.sunday) || 0,
+    holiday: Number(r.holiday) || 0,
+    dayTotal: Number(r.dayTotal) || 0,
+    notes: r.notes || '',
+  }));
+
+  const holidayList: CompanyHoliday[] = (holidays || []).map(h => ({
+    id: h.id,
+    date: h.date,
+    name: h.name,
+    type: h.type,
+    isPaid: Boolean(Number(h.isPaid)),
+  }));
+
+  const updatedRecords = applyHolidaySandwichRule(records, holidayList);
+
+  for (const u of updatedRecords) {
+    const orig = rows.find(r => r.id === u.id);
+    if (!orig) continue;
+
+    const musterChanged = orig.muster !== u.muster;
+    const statusChanged = orig.status !== u.status;
+    const holidayChanged = Number(orig.holiday) !== Number(u.holiday);
+    const dayTotalChanged = Number(orig.dayTotal) !== Number(u.dayTotal);
+    const notesChanged = (orig.notes || '') !== (u.notes || '');
+
+    if (musterChanged || statusChanged || holidayChanged || dayTotalChanged || notesChanged) {
+      await runQuery(`
+        UPDATE attendance_logs SET
+          muster = ?,
+          status = ?,
+          holiday = ?,
+          onDuty = ?,
+          sunday = ?,
+          dayTotal = ?,
+          notes = ?
+        WHERE id = ?
+      `, [
+        u.muster,
+        u.status,
+        u.holiday,
+        u.onDuty || 0,
+        u.sunday || 0,
+        u.dayTotal,
+        u.notes || null,
+        u.id,
+      ]);
+    }
+  }
+};
+
+export const applyHolidayToAttendance = async (_date: string, _name: string, _isPaid: number): Promise<void> => {
+  await applyHolidaySandwichRuleToDb();
 };
 
 export const revertHolidayFromAttendance = async (date: string): Promise<void> => {
@@ -660,6 +729,9 @@ export const revertHolidayFromAttendance = async (date: string): Promise<void> =
       notes = NULL
     WHERE date = ? AND inTime != '--:--' AND inTime != '' AND inTime != '-'
   `, [date]);
+
+  // Re-evaluate sandwich rule for all remaining holidays
+  await applyHolidaySandwichRuleToDb();
 };
 
 export const createCompanyHoliday = async (req: Request, res: Response): Promise<void> => {
@@ -678,11 +750,11 @@ export const createCompanyHoliday = async (req: Request, res: Response): Promise
       VALUES (?, ?, ?, ?, ?)
     `, [id, date.trim(), name.trim(), holidayType, paidVal]);
 
-    await applyHolidayToAttendance(date.trim(), name.trim(), paidVal);
+    await applyHolidaySandwichRuleToDb();
 
     res.json({ 
       success: true, 
-      message: `Company holiday '${name}' added for date ${date} and applied to attendance logs` 
+      message: `Company holiday '${name}' added for date ${date} with Strict Sandwich Rule applied!` 
     });
   } catch (err) {
     console.error('Error creating holiday:', err);
@@ -711,12 +783,10 @@ export const deleteCompanyHoliday = async (req: Request, res: Response): Promise
 export const syncAllHolidays = async (_req: Request, res: Response): Promise<void> => {
   try {
     const holidays = await getAllRows<any>('SELECT * FROM company_holidays');
-    for (const h of holidays) {
-      await applyHolidayToAttendance(h.date, h.name, Number(h.isPaid));
-    }
+    await applyHolidaySandwichRuleToDb();
     res.json({ 
       success: true, 
-      message: `Successfully synchronized ${holidays.length} company holidays to attendance database!` 
+      message: `Successfully synchronized ${holidays.length} company holidays with Strict Sandwich Rule applied!` 
     });
   } catch (err) {
     console.error('Error syncing holidays:', err);
