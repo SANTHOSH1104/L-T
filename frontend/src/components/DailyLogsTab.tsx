@@ -19,7 +19,7 @@ import {
 import * as yup from 'yup';
 import { AttendanceRecord, ShiftConfig } from '../types/attendance';
 import { exportAttendanceToExcel } from '../utils/excelParser';
-import { processAttendanceRecord, parseTimeToMinutes } from '../utils/calculator';
+import { processAttendanceRecord, parseTimeToMinutes, isSundayDate } from '../utils/calculator';
 import { createManualPunchInDb } from '../services/api';
 import { Button, Input, Badge, Modal } from './common';
 import { formatHours } from '../utils/formatters';
@@ -96,7 +96,7 @@ export const DailyLogsTab: React.FC<DailyLogsTabProps> = ({
       else if (statusFilter === 'HALF_DAY') matchStatus = r.status === 'HALF_DAY';
       else if (statusFilter === 'ABSENT') matchStatus = r.status === 'ABSENT';
       else if (statusFilter === 'HOLIDAY') matchStatus = (r.holiday || 0) > 0 || r.muster === 'HL' || r.muster === 'HP';
-      else if (statusFilter === 'SUNDAY') matchStatus = (r.sunday || 0) > 0 || r.muster === 'WW';
+      else if (statusFilter === 'SUNDAY') matchStatus = (r.sunday || 0) > 0 || r.muster === 'WW' || isSundayDate(r.date);
       else if (statusFilter === 'OT') matchStatus = (r.overtimeHours || 0) > 0 || r.otHours > 0;
       else if (statusFilter === 'LATE') matchStatus = r.isLate;
 
@@ -278,7 +278,7 @@ export const DailyLogsTab: React.FC<DailyLogsTabProps> = ({
             { id: 'HALF_DAY', label: '🟡 Half Day' },
             { id: 'ABSENT', label: '🔴 Absent' },
             { id: 'HOLIDAY', label: '🎉 Holiday (HL/HP)' },
-            { id: 'SUNDAY', label: '☀️ Sunday (WW)' },
+            { id: 'SUNDAY', label: '☀️ Sunday (HL)' },
             { id: 'OT', label: '🟣 Overtime' },
             { id: 'LATE', label: '⚠️ Late In' },
           ].map(tab => (

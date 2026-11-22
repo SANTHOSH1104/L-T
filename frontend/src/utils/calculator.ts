@@ -220,8 +220,8 @@ export function processAttendanceRecord(
     const isWeekOff = isDateSunday || isExplicitWeekOff;
     const isOnDuty = rawMuster === 'OD';
     const holidayPaid = isHoliday && (companyHoliday ? companyHoliday.isPaid !== false : true);
-    const status: AttendanceStatus = isHoliday ? 'HOLIDAY' : isOnDuty ? 'PRESENT' : 'ABSENT';
-    const musterCode = isHoliday ? 'HL' : isWeekOff ? 'WW' : (rawMuster || 'AA');
+    const status: AttendanceStatus = (isHoliday || isWeekOff) ? 'HOLIDAY' : isOnDuty ? 'PRESENT' : 'ABSENT';
+    const musterCode = (isHoliday || isWeekOff) ? 'HL' : (rawMuster || 'AA');
     const dayTotal = isHoliday ? (holidayPaid ? 1 : 0) : isOnDuty ? 1 : 0;
 
     return {
@@ -252,13 +252,13 @@ export function processAttendanceRecord(
       isEarlyExit: false,
       otMinutes: 0,
       otHours: 0,
-      notes: isHoliday ? (companyHoliday ? `${companyHoliday.name} (Holiday)` : 'Holiday') : isWeekOff ? 'Weekly Off (WW)' : isOnDuty ? 'On Duty' : 'Absent (No Punch)',
+      notes: isHoliday ? (companyHoliday ? `${companyHoliday.name} (Holiday)` : 'Holiday') : isWeekOff ? 'Sunday Holiday (HL)' : isOnDuty ? 'On Duty' : 'Absent (No Punch)',
     };
   }
 
   // Single punch missing
   if (inMinutes === null || outMinutes === null) {
-    const musterCode = isDateSunday ? 'WW' : (rawMuster || 'MISSED');
+    const musterCode = isDateSunday ? 'HL' : (rawMuster || 'MISSED');
     return {
       id,
       empId,
@@ -342,18 +342,20 @@ export function processAttendanceRecord(
   }
 
   // 1. Late Come Duration (how much duration employee arrived late: HH:MM)
+  // Sunday has no late-coming deduction because Sunday is a holiday/off-day
   let lateComeDurationMinutes = 0;
-  if (inMinutes !== null && inMinutes > shiftStartMin) {
+  if (!isDateSunday && inMinutes !== null && inMinutes > shiftStartMin) {
     lateComeDurationMinutes = inMinutes - shiftStartMin;
   }
   const formattedLateCome = lateComeDurationMinutes > 0 ? formatMinutesToTime(lateComeDurationMinutes) : '';
-  const isLate = lateComeDurationMinutes > graceMinutes;
+  const isLate = !isDateSunday && lateComeDurationMinutes > graceMinutes;
 
   // 2. Early Go & Late Go Duration
+  // Sunday has no early exit / late go because Sunday is not a standard scheduled shift
   let earlyGoDurationMinutes = 0;
   let lateGoDurationMinutes = 0;
 
-  if (inMinutes !== null && outMinutes !== null) {
+  if (!isDateSunday && inMinutes !== null && outMinutes !== null) {
     if (shiftRule.isOvernight) {
       // OVERNIGHT SHIFT LOGIC (e.g. K6 18:00 to 06:00, K3 23:00 to 07:30)
       if (outMinutes >= shiftStartMin) {
@@ -394,15 +396,23 @@ export function processAttendanceRecord(
 
   // 3. Extra Time Duration & Overtime:
   // Mathematical Rule verified against ground-truth HR standard:
-  // - Early Comer (inMinutes <= shiftStartMin): (shiftStartMin - inMinutes) + LateGo
-  // - Late Comer (inMinutes > shiftStartMin): LateGo (late minutes are recorded in LateCome, NOT deducted from overtime past shift end)
-  // - Sunday Rule: "Sunday work time OT la add aaguthu" -> Sunday work time is credited to Sunday duty, NOT OT!
-  // - User Rule: "9hr mela extra time erdha overtime la 8 tha varanum" -> Overtime is capped at maximum 8 hours!
+  // - Sunday Rule: "sunday la work pana extra time la show panu mama avalo naram work pani eurkaganu sunday la todyal ha show panu mama ....example screenshort extra hrs la 8.28 nu erukom"
+  //   -> On Sunday, the total duration worked is shown in Extra Time (e.g. 06:01 to 14:29 = 8h 28m -> 08:28)
+  // - Weekdays:
+  //   - Early Comer (inMinutes <= shiftStartMin): (shiftStartMin - inMinutes) + LateGo
+  //   - Late Comer (inMinutes > shiftStartMin): LateGo (late minutes are recorded in LateCome, NOT deducted from overtime past shift end)
+  //   - User Rule: "9hr mela extra time erdha overtime la 8 tha varanum" -> Overtime is capped at maximum 8 hours!
   let extraDurationMinutes = 0;
   let overtimeHours = 0;
   let otDuty = 0;
 
-  if (!isDateSunday && inMinutes !== null && outMinutes !== null && status !== 'ABSENT') {
+  if (isDateSunday) {
+    if (inMinutes !== null && outMinutes !== null && workedMinutes > 0) {
+      extraDurationMinutes = workedMinutes;
+    }
+    overtimeHours = 0;
+    otDuty = 0;
+  } else if (inMinutes !== null && outMinutes !== null && status !== 'ABSENT') {
     if (shiftRule.isOvernight && outMinutes >= shiftStartMin) {
       // Overnight shift: left early on same night -> no extra time!
       extraDurationMinutes = 0;
@@ -436,10 +446,11 @@ export function processAttendanceRecord(
   const otHours = overtimeHours;
 
   // 7. Worktime Duration formatting:
-  // In standard HR practice, Worktime displays the standard shift duration for full day present
-  // (e.g. 08:30 for KG, 08:00 for K1/K2/K3), while extra time worked is captured in Extra Time & OT.
+  // On Sunday, regular shift worktime is '00:00' because all worked duration is captured in Extra Time & Sunday duty
   let standardWorkMin = standardShiftMin;
-  if (status === 'PRESENT') {
+  if (isDateSunday) {
+    standardWorkMin = 0;
+  } else if (status === 'PRESENT') {
     if (shiftRule.shiftCode === 'K6' && lateComeDurationMinutes > 0) {
       standardWorkMin = Math.max(0, standardShiftMin - lateComeDurationMinutes);
     }
@@ -452,7 +463,9 @@ export function processAttendanceRecord(
   } else if (status === 'ABSENT') {
     standardWorkMin = 0;
   }
-  const formattedWorktime = formatMinutesToTime(standardWorkMin);
+  const formattedWorktime = (isDateSunday && (inMinutes === null || outMinutes === null || workedMinutes === 0))
+    ? ''
+    : formatMinutesToTime(standardWorkMin);
 
   const musterUpper = String(muster || '').toUpperCase();
 
@@ -470,12 +483,12 @@ export function processAttendanceRecord(
     sundayDuty = 0;
   } else if (isDateSunday) {
     // SUNDAY RULE:
-    // "Na kudukura date la sunday erdha muster la ww podu.... suppose sunday work pana sundat column la varanum mama"
-    muster = 'WW';
-    if (workedHours >= fullDayHours || musterUpper === 'PP') {
+    // "Muster la WW sunday eruku adhuku HL nu chaneg paniko"
+    muster = 'HL';
+    if (workedHours >= fullDayHours || musterUpper === 'PP' || workedMinutes >= (standardShiftMin - graceMinutes) || workedHours >= 8.0) {
       sundayDuty = 1;
       status = 'PRESENT';
-    } else if (workedHours >= halfDayHours || musterUpper === 'PA' || musterUpper === 'AP') {
+    } else if (workedHours >= halfDayHours || musterUpper === 'PA' || musterUpper === 'AP' || workedHours >= 4.0) {
       sundayDuty = 0.5;
       status = 'HALF_DAY';
     } else {
@@ -508,9 +521,9 @@ export function processAttendanceRecord(
     notes = companyHoliday ? `Worked on Holiday: ${companyHoliday.name}` : 'Worked on Holiday';
     if (otDuty > 0) notes += ` + OT (${overtimeHours}h)`;
   } else if (isDateSunday) {
-    if (sundayDuty === 1) notes = otDuty > 0 ? `Sunday Full Duty + OT (${overtimeHours}h)` : 'Sunday Full Duty (1d)';
-    else if (sundayDuty === 0.5) notes = 'Sunday Half Duty (0.5d)';
-    else notes = 'Weekly Off (WW)';
+    if (sundayDuty === 1) notes = 'Sunday Full Duty (HL)';
+    else if (sundayDuty === 0.5) notes = 'Sunday Half Duty (HL)';
+    else notes = 'Sunday Holiday (HL)';
   } else {
     if (status === 'HALF_DAY') notes = 'Half Day (0.5d)';
     else if (status === 'ABSENT') notes = 'Absent';
