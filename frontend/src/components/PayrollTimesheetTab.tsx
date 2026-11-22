@@ -158,27 +158,26 @@ export const PayrollTimesheetTab: React.FC<PayrollTimesheetTabProps> = ({
               <tr>
                 <th className="py-3 px-4 sticky left-0 bg-slate-50 z-20 shadow-xs border-r border-slate-200 min-w-[170px]">Employee</th>
                 <th className="py-3 px-3">Dept</th>
-                <th className="py-3 px-2 text-center">Total</th>
-                <th className="py-3 px-2 text-center text-emerald-700">Present (1.0)</th>
-                <th className="py-3 px-2 text-center text-amber-600">Half (0.5)</th>
-                <th className="py-3 px-2 text-center text-rose-600">Absent</th>
-                <th className="py-3 px-2 text-center text-blue-600">OD</th>
+                <th className="py-3 px-2 text-center text-slate-700" title="Month Standard Working Days (Excluding Sundays & Holidays)">Month Days</th>
+                <th className="py-3 px-2 text-center text-emerald-700" title="Actual Days Attended on Working Days">Actual Present</th>
+                <th className="py-3 px-2 text-center text-rose-600" title="Absent on Working Days">Absent</th>
+                <th className="py-3 px-2 text-center text-amber-600 font-bold bg-amber-50/40" title="Compensatory Off Days Adjusted from OT">Comp-Off</th>
+                <th className="py-3 px-2 text-center text-emerald-800 font-bold bg-emerald-50/40" title="Final Effective Work Days (Present + Comp-Off)">Final Work</th>
+                <th className="py-3 px-2 text-center text-purple-700" title="Total Accumulated OT Duties (Days)">Total OT</th>
+                <th className="py-3 px-2 text-center text-purple-900 font-bold bg-purple-50/50" title="Remaining OT Duties to be Paid">Paid OT</th>
                 <th className="py-3 px-2 text-center text-indigo-600">Sunday</th>
                 <th className="py-3 px-2 text-center text-teal-600">Holiday</th>
-                <th className="py-3 px-3 text-center bg-emerald-50/50 font-bold text-emerald-800">
+                <th className="py-3 px-3 text-center bg-emerald-100/60 font-black text-emerald-900">
                   Payable Days
                 </th>
                 <th className="py-3 px-2 text-center font-mono">Work Hours</th>
-                <th className="py-3 px-2 text-center bg-purple-50/50 font-bold text-purple-800">
-                  OT Hours
-                </th>
                 <th className="py-3 px-3 text-center rounded-r-lg">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredAndSorted.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="text-center py-8 text-slate-400">
+                  <td colSpan={14} className="text-center py-8 text-slate-400">
                     No employee summaries available.
                   </td>
                 </tr>
@@ -191,20 +190,31 @@ export const PayrollTimesheetTab: React.FC<PayrollTimesheetTabProps> = ({
                         <div className="text-[11px] text-slate-400 font-mono">{s.empId}</div>
                       </td>
                       <td className="py-3 px-3 text-slate-600">{s.department}</td>
-                      <td className="py-3 px-2 text-center font-mono font-medium text-slate-700">{s.totalDays}</td>
-                      <td className="py-3 px-2 text-center font-mono font-bold text-emerald-700">{s.presentDays}</td>
-                      <td className="py-3 px-2 text-center font-mono font-semibold text-amber-600">{s.halfDays}</td>
-                      <td className="py-3 px-2 text-center font-mono font-semibold text-rose-600">{s.absentDays}</td>
-                      <td className="py-3 px-2 text-center font-mono font-medium text-blue-700">{s.totalOnDuty || 0}</td>
+                      <td className="py-3 px-2 text-center font-mono font-bold text-slate-700">{s.monthWorkingDays ?? s.totalDays}</td>
+                      <td className="py-3 px-2 text-center font-mono font-bold text-emerald-700">{s.actualPresentDays ?? s.totalOnDuty ?? s.presentDays}</td>
+                      <td className="py-3 px-2 text-center font-mono font-semibold text-rose-600">{s.monthAbsentDays ?? s.absentDays}</td>
+                      <td className="py-3 px-2 text-center font-mono font-bold text-amber-600 bg-amber-50/30">
+                        {s.compOffDays && s.compOffDays > 0 ? (
+                          <span className="inline-block px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[11px]">
+                            +{s.compOffDays}
+                          </span>
+                        ) : '-'}
+                      </td>
+                      <td className="py-3 px-2 text-center font-mono font-extrabold text-emerald-800 bg-emerald-50/30">
+                        {s.finalWorkDays ?? (s.totalOnDuty ?? s.presentDays)}
+                      </td>
+                      <td className="py-3 px-2 text-center font-mono font-medium text-purple-700">
+                        {s.totalOtDuties !== undefined ? `${s.totalOtDuties}d` : '0d'}
+                      </td>
+                      <td className="py-3 px-2 text-center font-mono font-bold text-purple-900 bg-purple-50/30">
+                        {s.paidOtDuties !== undefined ? `${s.paidOtDuties}d` : '0d'}
+                      </td>
                       <td className="py-3 px-2 text-center font-mono font-medium text-indigo-700">{s.totalSundays || 0}</td>
                       <td className="py-3 px-2 text-center font-mono font-medium text-teal-700">{s.totalHolidays || 0}</td>
-                      <td className="py-3 px-3 text-center font-mono font-bold text-emerald-800 bg-emerald-50/30">
+                      <td className="py-3 px-3 text-center font-mono font-black text-emerald-900 bg-emerald-100/50">
                         {Number(s.netPayableDays.toFixed(3))}
                       </td>
                       <td className="py-3 px-2 text-center font-mono text-slate-600">{formatHours(s.totalWorkHours)}</td>
-                      <td className="py-3 px-2 text-center font-mono font-bold text-purple-700 bg-purple-50/30">
-                        {s.totalOtHours > 0 ? `+${s.totalOtHours}h` : '0h'}
-                      </td>
                       <td className="py-3 px-3 text-center">
                         <Button
                           variant="ghost"
@@ -256,48 +266,74 @@ export const PayrollTimesheetTab: React.FC<PayrollTimesheetTabProps> = ({
 
             {/* Attendance Days Breakdown Table */}
             <div className="space-y-2 text-xs">
-              <div className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">Attendance Breakdown</div>
+              <div className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">Attendance Breakdown & Comp-Off Offset</div>
               <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100">
                 <div className="flex justify-between p-2.5">
-                  <span className="text-slate-600">Total Recorded Days</span>
-                  <span className="font-mono font-bold text-slate-900">{selectedPayslipEmp.totalDays} Days</span>
+                  <span className="text-slate-600">Month Standard Working Days</span>
+                  <span className="font-mono font-bold text-slate-900">{selectedPayslipEmp.monthWorkingDays ?? selectedPayslipEmp.totalDays} Days</span>
                 </div>
                 <div className="flex justify-between p-2.5">
                   <span className="text-slate-600 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Full Days (Present @ 1.0)
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Actual Present on Working Days
                   </span>
-                  <span className="font-mono font-bold text-emerald-700">{selectedPayslipEmp.presentDays} Days</span>
+                  <span className="font-mono font-bold text-emerald-700">{selectedPayslipEmp.actualPresentDays ?? selectedPayslipEmp.totalOnDuty ?? selectedPayslipEmp.presentDays} Days</span>
                 </div>
                 <div className="flex justify-between p-2.5">
                   <span className="text-slate-600 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-amber-400"></span> Half Days (@ 0.5)
+                    <span className="w-2 h-2 rounded-full bg-rose-500"></span> Absent Days
                   </span>
-                  <span className="font-mono font-bold text-amber-700">{selectedPayslipEmp.halfDays} Days</span>
+                  <span className="font-mono font-bold text-rose-700">{selectedPayslipEmp.monthAbsentDays ?? selectedPayslipEmp.absentDays} Days</span>
+                </div>
+                {(selectedPayslipEmp.compOffDays ?? 0) > 0 && (
+                  <div className="flex justify-between p-2.5 bg-amber-50/60 font-semibold text-amber-900">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-amber-500"></span> Compensatory Off (Covered from OT)
+                    </span>
+                    <span className="font-mono font-bold text-amber-800">+{selectedPayslipEmp.compOffDays} Day</span>
+                  </div>
+                )}
+                <div className="flex justify-between p-2.5 bg-emerald-50/40 font-bold">
+                  <span className="text-emerald-900">Final Effective Work Days</span>
+                  <span className="font-mono text-emerald-800">
+                    {selectedPayslipEmp.finalWorkDays ?? (selectedPayslipEmp.totalOnDuty ?? selectedPayslipEmp.presentDays)} Days
+                  </span>
                 </div>
                 <div className="flex justify-between p-2.5">
-                  <span className="text-slate-600 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-rose-500"></span> Absent Days (@ 0.0)
-                  </span>
-                  <span className="font-mono font-bold text-rose-700">{selectedPayslipEmp.absentDays} Days</span>
+                  <span className="text-slate-600">Sunday / Off Duty Days</span>
+                  <span className="font-mono font-bold text-indigo-700">{selectedPayslipEmp.totalSundays || 0} Days</span>
                 </div>
-                <div className="flex justify-between p-2.5 bg-emerald-50 font-bold">
-                  <span className="text-emerald-900">Net Payable Days for Salary</span>
-                  <span className="font-mono text-emerald-800 text-sm">
-                    {selectedPayslipEmp.netPayableDays.toFixed(1)} Days
+                <div className="flex justify-between p-2.5">
+                  <span className="text-slate-600">Paid Holiday Credit</span>
+                  <span className="font-mono font-bold text-teal-700">{selectedPayslipEmp.totalHolidays || 0} Days</span>
+                </div>
+                <div className="flex justify-between p-2.5 bg-emerald-100/60 font-black">
+                  <span className="text-emerald-950">Net Payable Total Days for Salary</span>
+                  <span className="font-mono text-emerald-900 text-sm">
+                    {Number(selectedPayslipEmp.netPayableDays.toFixed(3))} Days
                   </span>
                 </div>
               </div>
             </div>
 
             {/* Overtime (OT) Record */}
-            <div className="p-3.5 bg-purple-50/70 border border-purple-200/60 rounded-2xl text-xs space-y-1.5">
+            <div className="p-3.5 bg-purple-50/70 border border-purple-200/60 rounded-2xl text-xs space-y-2">
               <div className="flex justify-between items-center text-purple-900 font-bold text-[11px] uppercase tracking-wider">
-                <span>Overtime (OT) Tracking</span>
-                <span className="font-mono text-xs">Min Rule: &gt;= {config.minOtQualifyHours ?? 2.0}h</span>
+                <span>Overtime (OT) & Comp-Off Audit</span>
+                <span className="font-mono text-xs">Rule: &gt;= {config.minOtQualifyHours ?? 2.0}h</span>
               </div>
               <div className="flex justify-between text-purple-800 pt-1">
-                <span>Total Qualified OT Hours:</span>
-                <span className="font-bold font-mono text-sm">+{selectedPayslipEmp.totalOtHours} Hours</span>
+                <span>Total Accumulated OT Days:</span>
+                <span className="font-bold font-mono text-sm">{selectedPayslipEmp.totalOtDuties ?? 0} Days (+{selectedPayslipEmp.totalOtHours}h)</span>
+              </div>
+              {(selectedPayslipEmp.compOffOtDuties ?? 0) > 0 && (
+                <div className="flex justify-between text-amber-800">
+                  <span>OT Adjusted to Comp-Off (Absent Cover):</span>
+                  <span className="font-bold font-mono text-sm">-{selectedPayslipEmp.compOffOtDuties} Day</span>
+                </div>
+              )}
+              <div className="flex justify-between text-purple-950 font-bold pt-1 border-t border-purple-200/50">
+                <span>Net Paid Overtime Days:</span>
+                <span className="font-extrabold font-mono text-sm text-purple-900">{selectedPayslipEmp.paidOtDuties ?? (selectedPayslipEmp.totalOtDuties ?? 0)} Days</span>
               </div>
             </div>
 

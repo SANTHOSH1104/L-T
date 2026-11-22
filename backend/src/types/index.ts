@@ -88,6 +88,13 @@ export interface EmployeeSummary {
   totalWorkHours: number;
   totalOtHours: number;
   estimatedOtPay: number;
+  monthWorkingDays?: number;
+  actualPresentDays?: number;
+  monthAbsentDays?: number;
+  compOffDays?: number;
+  finalWorkDays?: number;
+  compOffOtDuties?: number;
+  paidOtDuties?: number;
 }
 
 export interface ColumnMapping {

@@ -574,6 +574,13 @@ export function generateEmployeeSummaries(
 ): EmployeeSummary[] {
   const map = new Map<string, EmployeeSummary>();
 
+  // Determine standard working dates for the dataset
+  // A working date is any unique date in the records that is NOT Sunday and NOT a declared company holiday
+  const distinctDates = Array.from(new Set(records.map(r => r.date).filter(Boolean)));
+  const holidayDates = new Set((config.holidays || []).map(h => h.date));
+  const standardWorkingDates = distinctDates.filter(d => !isSundayDate(d) && !holidayDates.has(d));
+  const totalMonthWorkingDays = standardWorkingDates.length;
+
   for (const r of records) {
     if (!map.has(r.empId)) {
       map.set(r.empId, {
@@ -595,6 +602,13 @@ export function generateEmployeeSummaries(
         totalWorkHours: 0,
         totalOtHours: 0,
         estimatedOtPay: 0,
+        monthWorkingDays: totalMonthWorkingDays,
+        actualPresentDays: 0,
+        monthAbsentDays: 0,
+        compOffDays: 0,
+        finalWorkDays: 0,
+        compOffOtDuties: 0,
+        paidOtDuties: 0,
       });
     }
 
@@ -620,6 +634,13 @@ export function generateEmployeeSummaries(
       summary.totalLateMarks += 1;
     }
 
+    summary.totalWorkHours = Number((Number(summary.totalWorkHours) + Number(r.totalHours || 0)).toFixed(2));
+    summary.totalOtHours = Number((Number(summary.totalOtHours) + Number(r.otHours || 0)).toFixed(2));
+  }
+
+  // Second pass: Calculate Comp-Off offset, Final Work Days, and Paid OT Days for each employee
+  for (const summary of map.values()) {
+    // Late penalty deduction (e.g. 3 late marks = 0.5 day cut)
     if (config.enableLatePenalty) {
       const graceCount = config.lateGraceCount || 3;
       summary.latePenaltyDays = Number((Math.floor(summary.totalLateMarks / graceCount) * 0.5).toFixed(1));
@@ -627,11 +648,40 @@ export function generateEmployeeSummaries(
       summary.latePenaltyDays = 0;
     }
 
-    summary.totalWorkHours = Number((Number(summary.totalWorkHours) + Number(r.totalHours || 0)).toFixed(2));
-    summary.totalOtHours = Number((Number(summary.totalOtHours) + Number(r.otHours || 0)).toFixed(2));
-    // Net Payable Days = On Duty Days + OT Duties + Sundays + Holidays - Late Penalties
-    summary.netPayableDays = Math.max(0, Number(((summary.totalOnDuty || summary.presentDays) + (summary.totalOtDuties || 0) + (summary.totalSundays || 0) + (summary.totalHolidays || 0) - summary.latePenaltyDays).toFixed(3)));
-    summary.estimatedOtPay = Math.round(summary.totalOtHours * (config.otHourlyRate || 0));
+    const monthWorkingDays = summary.monthWorkingDays || totalMonthWorkingDays;
+    const actualPresent = summary.totalOnDuty ?? summary.presentDays;
+    summary.actualPresentDays = actualPresent;
+
+    // Absent days on standard working days:
+    const absent = Math.max(0, Number((monthWorkingDays - actualPresent).toFixed(1)));
+    summary.monthAbsentDays = absent;
+
+    const totalOt = summary.totalOtDuties || 0;
+
+    // Comp-Off Offset:
+    // If employee has absent days on working days AND has accumulated OT duties:
+    // 1 day of OT is converted to 1 day of Comp-Off to cover the absent day!
+    // compOff = min(absent, totalOt)
+    const compOff = Number(Math.min(absent, totalOt).toFixed(3));
+    summary.compOffDays = compOff;
+    summary.compOffOtDuties = compOff;
+
+    // Final Work Days achieved:
+    summary.finalWorkDays = Number((actualPresent + compOff).toFixed(1));
+
+    // Remaining OT to be paid as Overtime:
+    summary.paidOtDuties = Math.max(0, Number((totalOt - compOff).toFixed(3)));
+
+    // Net Payable Days = Final Work Days + Paid OT Duties + Sundays + Holidays - Late Penalties
+    summary.netPayableDays = Math.max(0, Number((
+      summary.finalWorkDays + 
+      summary.paidOtDuties + 
+      (summary.totalSundays || 0) + 
+      (summary.totalHolidays || 0) - 
+      summary.latePenaltyDays
+    ).toFixed(3)));
+
+    summary.estimatedOtPay = Math.round((summary.paidOtDuties * 8) * (config.otHourlyRate || 0));
   }
 
   return Array.from(map.values()).sort((a, b) => a.empId.localeCompare(b.empId));
