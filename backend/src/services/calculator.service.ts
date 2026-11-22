@@ -293,6 +293,8 @@ export function calculateRecord(
   let status: AttendanceStatus = 'PRESENT';
   let muster = rawMuster;
 
+  const standardShiftMin = Math.round(fullDayHours * 60);
+
   if (rawMuster === 'PP') {
     status = 'PRESENT';
   } else if (rawMuster === 'PA' || rawMuster === 'AP') {
@@ -302,8 +304,17 @@ export function calculateRecord(
   } else if (rawMuster === 'WO') {
     status = 'PRESENT';
   } else {
-    // If no explicit muster in file, determine dynamically from hours
-    if (workedHours >= fullDayHours) {
+    // If no explicit muster in file, determine dynamically from hours & shift window
+    // 1. Employee completed the shift within permitted grace (e.g. 08:31 to 17:00 when shift is 08:30 to 17:00)
+    const completedShiftWithGrace = (inMinutes <= shiftStartMin + graceMinutes) && 
+      (shiftRule.isOvernight 
+        ? (outMinutes >= shiftEndMin || (outMinutes < shiftStartMin && outMinutes >= shiftEndMin - graceMinutes))
+        : (outMinutes >= shiftEndMin - graceMinutes));
+
+    // 2. Worked duration matches full day (allowing for grace window or late arrival within shift, e.g. >= standardShiftMin - graceMinutes or >= fullDayHours - 1.0)
+    const workedFullDayDuration = workedMinutes >= (standardShiftMin - graceMinutes) || workedHours >= (fullDayHours - 1.0);
+
+    if (completedShiftWithGrace || workedFullDayDuration || workedHours >= fullDayHours) {
       status = 'PRESENT';
       muster = 'PP';
     } else if (workedHours >= halfDayHours) {
@@ -412,7 +423,6 @@ export function calculateRecord(
   // 7. Worktime Duration formatting:
   // In standard HR practice, Worktime displays the standard shift duration for full day present
   // (e.g. 08:30 for KG, 08:00 for K1/K2/K3), while extra time worked is captured in Extra Time & OT.
-  const standardShiftMin = Math.round(fullDayHours * 60);
   let standardWorkMin = standardShiftMin;
   if (status === 'PRESENT') {
     if (shiftRule.shiftCode === 'K6' && lateComeDurationMinutes > 0) {
