@@ -29,7 +29,7 @@ const authLimiter = rateLimit({
 
 // 3. CORS & Parsers
 app.use(cors({
-  origin: (origin, callback) => {
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
     // Allow server-to-server, curl, mobile, or requests without origin
     if (!origin) return callback(null, true);
     // Allow localhost, vercel deployments, or configured CLIENT_URL
@@ -54,11 +54,11 @@ app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/attendance', attendanceRoutes);
 
 // Health check
-app.get('/api/health', (_req, res) => {
+app.get('/api/health', (_req: express.Request, res: express.Response) => {
   res.json({
     status: 'online',
     service: 'PunchPulse HR SaaS Backend',
-    database: 'XAMPP MySQL (punchpulse_hr)',
+    database: 'TiDB Cloud MySQL (punchpulse_hr)',
     security: 'Helmet + RateLimiter + Yup active',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
