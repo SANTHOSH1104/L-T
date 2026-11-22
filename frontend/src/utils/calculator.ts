@@ -1,4 +1,4 @@
-import { AttendanceRecord, AttendanceStatus, EmployeeSummary, ShiftConfig, ShiftDefinition } from '../types/attendance';
+import { AttendanceRecord, AttendanceStatus, CompanyHoliday, EmployeeSummary, ShiftConfig, ShiftDefinition } from '../types/attendance';
 
 export const DEFAULT_SHIFTS: ShiftDefinition[] = [
   { shiftCode: 'KG', shiftName: 'General Shift (KG)', shiftStart: '08:30', shiftEnd: '17:00', fullDayHours: 8.5, halfDayHours: 4, graceMinutes: 15, isOvernight: false },
@@ -611,5 +611,165 @@ export function generateEmployeeSummaries(
   }
 
   return Array.from(map.values()).sort((a, b) => a.empId.localeCompare(b.empId));
+}
+
+/**
+ * Strict Holiday Sandwich Rule Evaluator:
+ * "mama rendu naluma vadhu erukanum before and after must vadhu erukanum mama"
+ * 1. Sunday Rule: If Sunday is in-between, skip Sunday and check the real working day before/after.
+ * 2. Punch / Half Day Rule: "half day vadha kuda ok tha punch pani erukanum" -> Present or Half Day qualifies as worked.
+ * 3. Paid Holiday:
+ *    - Both Before AND After must be attended -> Paid Holiday: muster = 'HL', status = 'HOLIDAY', holiday = 1.0, dayTotal = 1.0.
+ *    - If either Before or After was NOT attended -> Unpaid: muster = 'AA', status = 'ABSENT', holiday = 0.0, dayTotal = 0.0.
+ *    - If employee actually worked on the holiday itself -> muster = 'HP', status = 'PRESENT', holiday = 1.0, dayTotal = 1.0 + otDuty.
+ */
+export function applyHolidaySandwichRule(
+  records: AttendanceRecord[],
+  holidays: CompanyHoliday[]
+): AttendanceRecord[] {
+  if (!records || records.length === 0 || !holidays || holidays.length === 0) {
+    return records;
+  }
+
+  const holidayMap = new Map<string, CompanyHoliday>();
+  for (const h of holidays) {
+    if (h.date) {
+      holidayMap.set(h.date, h);
+    }
+  }
+
+  const allDates = Array.from(new Set(records.map(r => r.date))).filter(Boolean).sort();
+  if (allDates.length === 0) return records;
+
+  const isSunday = (dStr: string): boolean => {
+    try {
+      const dt = new Date(`${dStr}T00:00:00`);
+      return dt.getDay() === 0;
+    } catch {
+      return false;
+    }
+  };
+
+  // Find immediate preceding working day (skipping Sundays and other company holidays)
+  const findPrevWorkingDate = (currentDate: string): string | null => {
+    const curIdx = allDates.indexOf(currentDate);
+    if (curIdx <= 0) return null;
+    for (let i = curIdx - 1; i >= 0; i--) {
+      const d = allDates[i];
+      if (isSunday(d) || holidayMap.has(d)) {
+        continue;
+      }
+      return d;
+    }
+    return null;
+  };
+
+  // Find immediate succeeding working day (skipping Sundays and other company holidays)
+  const findNextWorkingDate = (currentDate: string): string | null => {
+    const curIdx = allDates.indexOf(currentDate);
+    if (curIdx === -1 || curIdx >= allDates.length - 1) return null;
+    for (let i = curIdx + 1; i < allDates.length; i++) {
+      const d = allDates[i];
+      if (isSunday(d) || holidayMap.has(d)) {
+        continue;
+      }
+      return d;
+    }
+    return null;
+  };
+
+  // Check if an employee attended / punched on a given date (Half Day is also accepted!)
+  const isWorkedOrPunched = (r?: AttendanceRecord): boolean => {
+    if (!r) return false;
+    if (r.status === 'PRESENT' || r.status === 'HALF_DAY') return true;
+    if (r.muster === 'PP' || r.muster === 'PA' || r.muster === 'AP' || r.muster === 'HP' || r.muster === 'OD') return true;
+    if (r.onDuty && r.onDuty > 0) return true;
+    const hasIn = Boolean(r.inTime && r.inTime !== '--:--' && r.inTime !== '' && r.inTime !== '-');
+    const hasOut = Boolean(r.outTime && r.outTime !== '--:--' && r.outTime !== '' && r.outTime !== '-');
+    return hasIn || hasOut;
+  };
+
+  // Group records by empId -> date -> record
+  const empRecords = new Map<string, Map<string, AttendanceRecord>>();
+  for (const r of records) {
+    if (!empRecords.has(r.empId)) {
+      empRecords.set(r.empId, new Map());
+    }
+    empRecords.get(r.empId)!.set(r.date, r);
+  }
+
+  // Evaluate records
+  return records.map(record => {
+    const holiday = holidayMap.get(record.date);
+    if (!holiday) {
+      return record; // Normal day, unadjusted
+    }
+
+    // Physical work on holiday itself
+    const hasPhysicalPunch = Boolean(
+      (record.inTime && record.inTime !== '--:--' && record.inTime !== '' && record.inTime !== '-') ||
+      (record.outTime && record.outTime !== '--:--' && record.outTime !== '' && record.outTime !== '-')
+    );
+
+    if (hasPhysicalPunch) {
+      return {
+        ...record,
+        muster: 'HP',
+        status: 'PRESENT',
+        holiday: holiday.isPaid !== false ? 1.0 : 0.0,
+        dayTotal: Number(((holiday.isPaid !== false ? 1.0 : 0.0) + (record.otDuty || 0)).toFixed(3)),
+        notes: `Worked on Holiday: ${holiday.name}`,
+      };
+    }
+
+    // Did not punch on holiday -> evaluate Sandwich Rule
+    const prevWorkingDate = findPrevWorkingDate(record.date);
+    const nextWorkingDate = findNextWorkingDate(record.date);
+
+    const empDateMap = empRecords.get(record.empId);
+    const workedBefore = prevWorkingDate ? isWorkedOrPunched(empDateMap?.get(prevWorkingDate)) : false;
+    const workedAfter = nextWorkingDate ? isWorkedOrPunched(empDateMap?.get(nextWorkingDate)) : false;
+
+    // Strict Sandwich Rule: Both Before AND After MUST be attended
+    const isEligible = workedBefore && workedAfter;
+
+    if (isEligible && holiday.isPaid !== false) {
+      // Eligible -> Paid Holiday (1.0 Duty)
+      return {
+        ...record,
+        inTime: '--:--',
+        outTime: '--:--',
+        muster: 'HL',
+        status: 'HOLIDAY',
+        holiday: 1.0,
+        onDuty: 0.0,
+        sunday: 0.0,
+        dayTotal: 1.0,
+        totalMinutes: 0,
+        totalHours: 0,
+        overtimeHours: 0,
+        otDuty: 0,
+        notes: `${holiday.name} (Paid Holiday: Sandwich Rule Passed)`,
+      };
+    } else {
+      // Not Eligible -> Absent (0.0 Duty, Unpaid)
+      return {
+        ...record,
+        inTime: '--:--',
+        outTime: '--:--',
+        muster: 'AA',
+        status: 'ABSENT',
+        holiday: 0.0,
+        onDuty: 0.0,
+        sunday: 0.0,
+        dayTotal: 0.0,
+        totalMinutes: 0,
+        totalHours: 0,
+        overtimeHours: 0,
+        otDuty: 0,
+        notes: `${holiday.name} (Unpaid Holiday: Absent Before/After)`,
+      };
+    }
+  });
 }
 
