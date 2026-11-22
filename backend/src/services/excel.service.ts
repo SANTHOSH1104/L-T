@@ -214,7 +214,7 @@ export function generateExportExcelBuffer(records: AttendanceRecord[], summaries
       'IN Time': r.inTime,
       'OUT Time': r.outTime,
       'Muster': r.muster || (r.status === 'PRESENT' ? 'PP' : r.status === 'HALF_DAY' ? 'PA' : 'AA'),
-      'Working time': r.worktime || (r.totalMinutes > 0 ? formatMinutesToTime(r.totalMinutes) : '-'),
+      'Working time': (r.worktime !== undefined && r.worktime !== '') ? r.worktime : '-',
       'extra': r.extraTime || '-',
       'Overtime': overtimeHours,
       'late come': r.lateCome || '-',
