@@ -614,7 +614,7 @@ export function generateEmployeeSummaries(
 
     const summary = map.get(r.empId)!;
     summary.totalDays += 1;
-    summary.totalOnDuty = Number(((summary.totalOnDuty || 0) + (r.onDuty !== undefined ? r.onDuty : (r.status === 'PRESENT' ? 1 : r.status === 'HALF_DAY' ? 0.5 : 0))).toFixed(1));
+    summary.totalOnDuty = Number(((summary.totalOnDuty || 0) + (r.onDuty !== undefined ? r.onDuty : (r.status === 'PRESENT' ? 1 : r.status === 'HALF_DAY' ? 0.5 : 0))).toFixed(3));
     const otDutyUnit = r.otDuty !== undefined ? r.otDuty : ((r.otHours >= (config.minOtQualifyHours ?? 2.0)) ? Math.min(1.0, Number((r.otHours / 8).toFixed(3))) : 0);
     summary.totalOtDuties = Number(((summary.totalOtDuties || 0) + otDutyUnit).toFixed(3));
     summary.totalSundays = (summary.totalSundays || 0) + (r.sunday || 0);
@@ -653,7 +653,7 @@ export function generateEmployeeSummaries(
     summary.actualPresentDays = actualPresent;
 
     // Absent days on standard working days:
-    const absent = Math.max(0, Number((monthWorkingDays - actualPresent).toFixed(1)));
+    const absent = Math.max(0, Number((monthWorkingDays - actualPresent).toFixed(3)));
     summary.monthAbsentDays = absent;
 
     const totalOt = summary.totalOtDuties || 0;
@@ -667,7 +667,7 @@ export function generateEmployeeSummaries(
     summary.compOffOtDuties = compOff;
 
     // Final Work Days achieved:
-    summary.finalWorkDays = Number((actualPresent + compOff).toFixed(1));
+    summary.finalWorkDays = Number((actualPresent + compOff).toFixed(3));
 
     // Remaining OT to be paid as Overtime:
     summary.paidOtDuties = Math.max(0, Number((totalOt - compOff).toFixed(3)));
