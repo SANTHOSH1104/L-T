@@ -49,7 +49,8 @@ const computeShiftHoursFromTimes = (start: string, end: string, isOvernight?: bo
   const startMin = sH * 60 + sM;
   let endMin = eH * 60 + eM;
 
-  if (isOvernight || endMin < startMin) {
+  // Only wrap across midnight if end time is before start time (e.g. 23:00 to 06:00, 18:00 to 02:00)
+  if (endMin < startMin) {
     endMin += 1440;
   }
 
