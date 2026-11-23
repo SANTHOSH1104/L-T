@@ -167,6 +167,7 @@ export const PayrollTimesheetTab: React.FC<PayrollTimesheetTabProps> = ({
                 <th className="py-3 px-2 text-center text-amber-600 font-bold bg-amber-50/40" title="Compensatory Off Days Adjusted from OT">compooff</th>
                 <th className="py-3 px-2 text-center text-emerald-800 font-bold bg-emerald-50/40" title="Final Effective Work Days (Present + Comp-Off)">total work paid</th>
                 <th className="py-3 px-2 text-center text-purple-900 font-bold bg-purple-50/50" title="Remaining OT Duties to be Paid">OT paid</th>
+                <th className="py-3 px-2 text-center text-teal-800 font-bold bg-teal-50/40" title="Surplus Sunday/Holiday Comp-Off Carried Forward to Next Month">Comp-Off (Next Month)</th>
                 <th className="py-3 px-3 text-center bg-emerald-100/60 font-black text-emerald-900">
                   Total Payable Days
                 </th>
@@ -176,7 +177,7 @@ export const PayrollTimesheetTab: React.FC<PayrollTimesheetTabProps> = ({
             <tbody className="divide-y divide-slate-100">
               {filteredAndSorted.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="text-center py-8 text-slate-400">
+                  <td colSpan={14} className="text-center py-8 text-slate-400">
                     No employee summaries available.
                   </td>
                 </tr>
@@ -194,7 +195,7 @@ export const PayrollTimesheetTab: React.FC<PayrollTimesheetTabProps> = ({
                       <td className="py-3 px-2 text-center font-mono font-medium text-purple-700">
                         {s.totalOtDuties !== undefined ? `${s.totalOtDuties}` : '0'}
                       </td>
-                      <td className="py-3 px-2 text-center font-mono font-semibold text-rose-600">{s.monthAbsentDays ?? s.absentDays}</td>
+                      <td className="py-3 px-2 text-center font-mono font-semibold text-rose-600">{s.monthAbsentDays ?? 0}</td>
                       <td className="py-3 px-2 text-center font-mono font-medium text-indigo-700">{s.totalSundays || 0}</td>
                       <td className="py-3 px-2 text-center font-mono font-medium text-teal-700">{s.totalHolidays || 0}</td>
                       <td className="py-3 px-2 text-center font-mono font-bold text-amber-600 bg-amber-50/30">
@@ -209,6 +210,13 @@ export const PayrollTimesheetTab: React.FC<PayrollTimesheetTabProps> = ({
                       </td>
                       <td className="py-3 px-2 text-center font-mono font-bold text-purple-900 bg-purple-50/30">
                         {s.paidOtDuties !== undefined ? `${s.paidOtDuties}` : '0'}
+                      </td>
+                      <td className="py-3 px-2 text-center font-mono font-bold text-teal-800 bg-teal-50/30">
+                        {s.compOffNextMonth && s.compOffNextMonth > 0 ? (
+                          <span className="inline-block px-1.5 py-0.5 rounded bg-teal-100 text-teal-900 text-[11px] font-bold">
+                            +{s.compOffNextMonth}
+                          </span>
+                        ) : '-'}
                       </td>
                       <td className="py-3 px-3 text-center font-mono font-black text-emerald-900 bg-emerald-100/50">
                         {s.netPayableDays}
@@ -304,6 +312,14 @@ export const PayrollTimesheetTab: React.FC<PayrollTimesheetTabProps> = ({
                   <span className="text-slate-600">Paid Holiday Credit</span>
                   <span className="font-mono font-bold text-teal-700">{selectedPayslipEmp.totalHolidays || 0} Days</span>
                 </div>
+                {(selectedPayslipEmp.compOffNextMonth ?? 0) > 0 && (
+                  <div className="flex justify-between p-2.5 bg-teal-50/70 font-bold text-teal-900 border-l-2 border-teal-500">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-teal-500"></span> Comp-Off Leave Carried Forward (Next Month)
+                    </span>
+                    <span className="font-mono font-bold text-teal-800">+{selectedPayslipEmp.compOffNextMonth} Day</span>
+                  </div>
+                )}
                 <div className="flex justify-between p-2.5 bg-emerald-100/60 font-black">
                   <span className="text-emerald-950">Net Payable Total Days for Salary</span>
                   <span className="font-mono text-emerald-900 text-sm">

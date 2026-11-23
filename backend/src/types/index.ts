@@ -95,6 +95,9 @@ export interface EmployeeSummary {
   finalWorkDays?: number;
   compOffOtDuties?: number;
   paidOtDuties?: number;
+  compOffNextMonth?: number;
+  sundayUsedForWork?: number;
+  holidayUsedForWork?: number;
 }
 
 export interface ColumnMapping {

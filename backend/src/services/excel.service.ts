@@ -176,12 +176,13 @@ export function generateExportExcelBuffer(records: AttendanceRecord[], summaries
     'Working day': s.monthWorkingDays ?? s.totalDays,
     'Present': s.actualPresentDays ?? s.totalOnDuty ?? s.presentDays,
     'OT': s.totalOtDuties ?? 0,
-    'Absent': s.monthAbsentDays ?? s.absentDays,
+    'Absent': s.monthAbsentDays ?? 0,
     'sunday/off': s.totalSundays || 0,
     'Holiday': s.totalHolidays || 0,
     'compooff': s.compOffDays ?? 0,
     'total work paid': s.finalWorkDays ?? (s.totalOnDuty ?? s.presentDays),
     'OT paid': s.paidOtDuties ?? (s.totalOtDuties ?? 0),
+    'Comp-Off (Next Month)': s.compOffNextMonth ?? 0,
     'Total Payable Days': s.netPayableDays,
   }));
   const payrollSheet = XLSX.utils.json_to_sheet(payrollRows);

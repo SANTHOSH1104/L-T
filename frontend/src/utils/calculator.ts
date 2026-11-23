@@ -638,7 +638,7 @@ export function generateEmployeeSummaries(
     summary.totalOtHours = Number((Number(summary.totalOtHours) + Number(r.otHours || 0)).toFixed(2));
   }
 
-  // Second pass: Calculate Comp-Off offset, Final Work Days, and Paid OT Days for each employee
+  // Second pass: Calculate Priority 1 (Sunday/Holiday equalize month working days) & Priority 2 (OT offset)
   for (const summary of map.values()) {
     // Late penalty deduction (e.g. 3 late marks = 0.5 day cut)
     if (config.enableLatePenalty) {
@@ -652,32 +652,53 @@ export function generateEmployeeSummaries(
     const actualPresent = summary.totalOnDuty ?? summary.presentDays;
     summary.actualPresentDays = actualPresent;
 
-    // Absent days on standard working days:
-    const absent = Math.max(0, Number((monthWorkingDays - actualPresent).toFixed(3)));
-    summary.monthAbsentDays = absent;
+    // Standard working day absent before adjustments:
+    const initialShortfall = Math.max(0, Number((monthWorkingDays - actualPresent).toFixed(3)));
 
+    // Total weekend / holiday duty available to equalize month working days:
+    const totalSundays = summary.totalSundays || 0;
+    const totalHolidays = summary.totalHolidays || 0;
+    const weekendDuty = Number((totalSundays + totalHolidays).toFixed(3));
+
+    // Priority 1: Use worked Sundays & Holidays to equalize month working days:
+    // "present + sunday pakanum adhu 27 vadhichina apidya aduthukoma"
+    const weekendUsedForWork = Number(Math.min(initialShortfall, weekendDuty).toFixed(3));
+
+    const sundayUsed = Number(Math.min(initialShortfall, totalSundays).toFixed(3));
+    const remainingShortfallForHoliday = Math.max(0, Number((initialShortfall - sundayUsed).toFixed(3)));
+    const holidayUsed = Number(Math.min(remainingShortfallForHoliday, totalHolidays).toFixed(3));
+    summary.sundayUsedForWork = sundayUsed;
+    summary.holidayUsedForWork = holidayUsed;
+
+    // Surplus weekend duty beyond month working days:
+    // "presetn + sunday 27 vita mela pochina next month ku compo ha leave aduthukalam"
+    const weekendSurplus = Math.max(0, Number((weekendDuty - weekendUsedForWork).toFixed(3)));
+    summary.compOffNextMonth = weekendSurplus;
+
+    // Remaining shortfall after using Sunday/Holiday:
+    const remainingShortfall = Math.max(0, Number((initialShortfall - weekendUsedForWork).toFixed(3)));
+
+    // Priority 2: If shortfall still remains, use OT duties:
+    // "27 varalana ot la erdhu aduthukom"
     const totalOt = summary.totalOtDuties || 0;
+    const otUsedForWork = Number(Math.min(remainingShortfall, totalOt).toFixed(3));
+    summary.compOffDays = otUsedForWork;
+    summary.compOffOtDuties = otUsedForWork;
 
-    // Comp-Off Offset:
-    // If employee has absent days on working days AND has accumulated OT duties:
-    // 1 day of OT is converted to 1 day of Comp-Off to cover the absent day!
-    // compOff = min(absent, totalOt)
-    const compOff = Number(Math.min(absent, totalOt).toFixed(3));
-    summary.compOffDays = compOff;
-    summary.compOffOtDuties = compOff;
+    // Final absent days on working days (uncovered absent):
+    summary.monthAbsentDays = Math.max(0, Number((remainingShortfall - otUsedForWork).toFixed(3)));
 
     // Final Work Days achieved:
-    summary.finalWorkDays = Number((actualPresent + compOff).toFixed(3));
+    // actualPresent + weekendUsedForWork + otUsedForWork
+    summary.finalWorkDays = Number((actualPresent + weekendUsedForWork + otUsedForWork).toFixed(3));
 
     // Remaining OT to be paid as Overtime:
-    summary.paidOtDuties = Math.max(0, Number((totalOt - compOff).toFixed(3)));
+    summary.paidOtDuties = Math.max(0, Number((totalOt - otUsedForWork).toFixed(3)));
 
-    // Net Payable Days = Final Work Days + Paid OT Duties + Sundays + Holidays - Late Penalties
+    // Net Payable Days for this month:
     summary.netPayableDays = Math.max(0, Number((
       summary.finalWorkDays + 
-      summary.paidOtDuties + 
-      (summary.totalSundays || 0) + 
-      (summary.totalHolidays || 0) - 
+      summary.paidOtDuties - 
       summary.latePenaltyDays
     ).toFixed(3)));
 
