@@ -6,7 +6,9 @@ import {
   ArrowRight, 
   Download, 
   Settings2,
-  Sparkles
+  Sparkles,
+  Loader2,
+  Clock
 } from 'lucide-react';
 import { ColumnMapping, ShiftConfig, AttendanceRecord, EmployeeSummary } from '../types/attendance';
 import { readExcelFile, downloadSampleExcelTemplate, transformRowsToAttendance } from '../utils/excelParser';
@@ -31,6 +33,10 @@ export const UploadTab: React.FC<UploadTabProps> = ({
   const [mapping, setMapping] = useState<ColumnMapping | null>(null);
   const [previewRows, setPreviewRows] = useState<Record<string, unknown>[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStage, setProcessingStage] = useState<'reading' | 'calculating' | 'saving' | 'done'>('reading');
+  const [progressPercent, setProgressPercent] = useState<number>(10);
+  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
   const [showAdvancedMapping, setShowAdvancedMapping] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -79,10 +85,30 @@ export const UploadTab: React.FC<UploadTabProps> = ({
   const handleProcess = async () => {
     if (!selectedFile || !mapping) return;
     setIsLoading(true);
+    setIsProcessing(true);
+    setProcessingStage('reading');
+    setProgressPercent(15);
+    setElapsedSeconds(0);
     setStatusMessage(null);
+
+    const timer = setInterval(() => {
+      setElapsedSeconds((s) => s + 1);
+    }, 1000);
+
+    const t1 = setTimeout(() => {
+      setProcessingStage('calculating');
+      setProgressPercent(45);
+    }, 700);
+
+    const t2 = setTimeout(() => {
+      setProcessingStage('saving');
+      setProgressPercent(80);
+    }, 2000);
 
     try {
       const res = await uploadAttendanceFile(selectedFile, config, mapping);
+      setProgressPercent(100);
+      setProcessingStage('done');
       onDataProcessed(res.records, res.summaries);
       setStatusMessage({ 
         type: 'success', 
@@ -91,9 +117,13 @@ export const UploadTab: React.FC<UploadTabProps> = ({
     } catch (err: any) {
       console.warn('Backend upload notice, attempting client processing fallback:', err);
       try {
+        setProcessingStage('calculating');
+        setProgressPercent(60);
         const parsed = await readExcelFile(selectedFile);
         const records = transformRowsToAttendance(parsed.rawRows, mapping, config);
         const summaries = generateEmployeeSummaries(records, config);
+        setProgressPercent(100);
+        setProcessingStage('done');
         onDataProcessed(records, summaries);
         setStatusMessage({ 
           type: 'success', 
@@ -107,7 +137,13 @@ export const UploadTab: React.FC<UploadTabProps> = ({
         });
       }
     } finally {
-      setIsLoading(false);
+      clearInterval(timer);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      setTimeout(() => {
+        setIsLoading(false);
+        setIsProcessing(false);
+      }, 500);
     }
   };
 
@@ -495,6 +531,103 @@ export const UploadTab: React.FC<UploadTabProps> = ({
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+      {/* 6,000+ Records High-Tech Processing Modal Overlay */}
+      {isProcessing && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl border border-indigo-100 max-w-lg w-full p-8 space-y-6 text-center animate-in fade-in zoom-in-95 duration-200">
+            {/* Pulsing Biometric Icon */}
+            <div className="relative w-20 h-20 mx-auto">
+              <div className="absolute inset-0 rounded-3xl bg-indigo-500/20 animate-ping"></div>
+              <div className="relative w-20 h-20 rounded-3xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                <Loader2 className="w-10 h-10 animate-spin" />
+              </div>
+            </div>
+
+            {/* Title & File Info */}
+            <div className="space-y-1.5">
+              <h3 className="text-xl font-bold text-slate-900">
+                Processing Attendance Dataset
+              </h3>
+              <p className="text-xs text-slate-500 font-medium">
+                {selectedFile?.name} • {(selectedFile ? selectedFile.size / 1024 : 0).toFixed(1)} KB
+              </p>
+            </div>
+
+            {/* Shimmering Animated Progress Bar */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center text-xs font-semibold text-slate-600">
+                <span className="flex items-center space-x-1.5">
+                  <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></span>
+                  <span>
+                    {processingStage === 'reading' && 'Reading & parsing Excel punch data...'}
+                    {processingStage === 'calculating' && 'Calculating shifts, 2-Hr OT & sandwich rules...'}
+                    {processingStage === 'saving' && 'Batch-saving 6,000+ records to TiDB Cloud...'}
+                    {processingStage === 'done' && 'Finalizing attendance summaries...'}
+                  </span>
+                </span>
+                <span className="font-mono text-indigo-600 font-bold">{progressPercent}%</span>
+              </div>
+              <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-200">
+                <div
+                  className="h-full bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-500 rounded-full transition-all duration-500 ease-out shadow-xs"
+                  style={{ width: `${progressPercent}%` }}
+                ></div>
+              </div>
+            </div>
+
+            {/* Multi-Step Live Checklist */}
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 text-left space-y-2.5 text-xs">
+              <div className="flex items-center space-x-3">
+                {processingStage !== 'reading' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                ) : (
+                  <Loader2 className="w-4 h-4 text-indigo-600 animate-spin shrink-0" />
+                )}
+                <span className={processingStage !== 'reading' ? 'text-slate-700 font-medium' : 'text-indigo-700 font-bold'}>
+                  1. Excel In/Out punch parsing & column validation
+                </span>
+              </div>
+
+              <div className="flex items-center space-x-3">
+                {processingStage === 'saving' || processingStage === 'done' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                ) : processingStage === 'calculating' ? (
+                  <Loader2 className="w-4 h-4 text-indigo-600 animate-spin shrink-0" />
+                ) : (
+                  <div className="w-4 h-4 rounded-full border border-slate-300 shrink-0" />
+                )}
+                <span className={processingStage === 'saving' || processingStage === 'done' ? 'text-slate-700 font-medium' : processingStage === 'calculating' ? 'text-indigo-700 font-bold' : 'text-slate-400'}>
+                  2. Applying Shift (KG), 2-Hr Overtime & Holiday rules
+                </span>
+              </div>
+
+              <div className="flex items-center space-x-3">
+                {processingStage === 'done' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                ) : processingStage === 'saving' ? (
+                  <Loader2 className="w-4 h-4 text-indigo-600 animate-spin shrink-0" />
+                ) : (
+                  <div className="w-4 h-4 rounded-full border border-slate-300 shrink-0" />
+                )}
+                <span className={processingStage === 'done' ? 'text-slate-700 font-medium' : processingStage === 'saving' ? 'text-indigo-700 font-bold' : 'text-slate-400'}>
+                  3. Multi-row batch insertion to TiDB Serverless Cloud
+                </span>
+              </div>
+            </div>
+
+            {/* Timer and Reassurance Footer */}
+            <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+              <span className="flex items-center space-x-1.5 font-mono text-slate-600">
+                <Clock className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Elapsed: {elapsedSeconds}s</span>
+              </span>
+              <span className="text-amber-600 font-medium">
+                ⚠️ Do not close or refresh this page
+              </span>
+            </div>
           </div>
         </div>
       )}

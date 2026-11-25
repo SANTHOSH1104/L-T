@@ -309,47 +309,70 @@ export const uploadAndProcess = async (req: Request, res: Response): Promise<voi
     // Apply Strict Holiday Sandwich Rule
     const records = applyHolidaySandwichRule(initialRecords, config.holidays || []);
 
-    // Save into MySQL Database
-    for (const r of records) {
+    // Save into MySQL Database in high-performance batches (200 records per query for fast 6000+ upload)
+    const BATCH_SIZE = 200;
+    for (let i = 0; i < records.length; i += BATCH_SIZE) {
+      const batch = records.slice(i, i + BATCH_SIZE);
+      const placeholders = batch.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
+      const params: any[] = [];
+      for (const r of batch) {
+        params.push(
+          r.id,
+          r.empId,
+          r.empName,
+          r.department,
+          r.shift || 'KG',
+          r.date,
+          r.inTime,
+          r.outTime,
+          r.muster || 'PP',
+          r.worktime || '',
+          r.extraTime || '',
+          r.overtimeHours || 0,
+          r.lateCome || '',
+          r.earlyGo || '',
+          r.lateGo || '',
+          r.otDuty || 0,
+          r.onDuty || 0,
+          r.sunday || 0,
+          r.holiday || 0,
+          r.dayTotal !== undefined ? r.dayTotal : (r.totalHours >= 8 ? 1 : 0),
+          r.totalMinutes,
+          r.totalHours,
+          r.status,
+          r.isLate ? 1 : 0,
+          r.isEarlyExit ? 1 : 0,
+          r.otMinutes,
+          r.otHours,
+          r.notes || null
+        );
+      }
       await runQuery(`
         REPLACE INTO attendance_logs
         (id, empId, empName, department, shift, date, inTime, outTime, muster, worktime, extraTime, overtimeHours, lateCome, earlyGo, lateGo, otDuty, onDuty, sunday, holiday, dayTotal, totalMinutes, totalHours, status, isLate, isEarlyExit, otMinutes, otHours, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [
-        r.id,
-        r.empId,
-        r.empName,
-        r.department,
-        r.shift || 'KG',
-        r.date,
-        r.inTime,
-        r.outTime,
-        r.muster || 'PP',
-        r.worktime || '',
-        r.extraTime || '',
-        r.overtimeHours || 0,
-        r.lateCome || '',
-        r.earlyGo || '',
-        r.lateGo || '',
-        r.otDuty || 0,
-        r.onDuty || 0,
-        r.sunday || 0,
-        r.holiday || 0,
-        r.dayTotal !== undefined ? r.dayTotal : (r.totalHours >= 8 ? 1 : 0),
-        r.totalMinutes,
-        r.totalHours,
-        r.status,
-        r.isLate ? 1 : 0,
-        r.isEarlyExit ? 1 : 0,
-        r.otMinutes,
-        r.otHours,
-        r.notes || null
-      ]);
+        VALUES ${placeholders}
+      `, params);
+    }
 
+    // Save unique employees in batches
+    const empMap = new Map<string, { empId: string; name: string; department: string }>();
+    for (const r of records) {
+      if (r.empId && !empMap.has(r.empId)) {
+        empMap.set(r.empId, { empId: r.empId, name: r.empName, department: r.department });
+      }
+    }
+    const empList = Array.from(empMap.values());
+    for (let i = 0; i < empList.length; i += BATCH_SIZE) {
+      const batch = empList.slice(i, i + BATCH_SIZE);
+      const placeholders = batch.map(() => '(?, ?, ?)').join(', ');
+      const params: any[] = [];
+      for (const e of batch) {
+        params.push(e.empId, e.name, e.department);
+      }
       await runQuery(`
         INSERT IGNORE INTO employees (empId, name, department)
-        VALUES (?, ?, ?)
-      `, [r.empId, r.empName, r.department]);
+        VALUES ${placeholders}
+      `, params);
     }
 
     // Fetch refreshed complete list from DB
