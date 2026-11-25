@@ -604,10 +604,13 @@ export function generateEmployeeSummaries(
   const map = new Map<string, EmployeeSummary>();
 
   // Determine standard working dates for the dataset
-  // User rule: Exclude ONLY Sundays (Holidays are included in company working days, so October = 27 days!)
-  // "company working caluclate sunday matum add panatha mamam.... holder kuda add panu apo oct 27 days varum"
+  // Exclude Sundays and Holidays (so October = 25 standard working days, matching user sheet)
   const distinctDates = Array.from(new Set(records.map(r => r.date).filter(Boolean)));
-  const standardWorkingDates = distinctDates.filter(d => !isSundayDate(d));
+  const holidayDates = new Set([
+    ...(config.holidays || []).map(h => h.date),
+    ...records.filter(r => r.status === 'HOLIDAY' || (r.holiday && r.holiday > 0)).map(r => r.date)
+  ]);
+  const standardWorkingDates = distinctDates.filter(d => !isSundayDate(d) && !holidayDates.has(d));
   const totalMonthWorkingDays = standardWorkingDates.length;
 
   for (const r of records) {
@@ -679,51 +682,55 @@ export function generateEmployeeSummaries(
 
     const monthWorkingDays = summary.monthWorkingDays || totalMonthWorkingDays;
 
-    // Actual worked days on regular working days:
+    // User requirement: "summary la holiday presnt anaga and working la presetm aaava separa pani shiow panu mama"
+    // 1. Working Present (Actual worked days on regular working days):
     const workedDays = summary.totalOnDuty ?? summary.presentDays;
-    // Eligible paid holidays (where employee attended before or after):
+    summary.actualPresentDays = workedDays;
+    summary.presentDays = workedDays;
+
+    // 2. Holiday Present (Eligible paid holidays from attendance / sandwich rule):
     const paidHolidays = summary.totalHolidays || 0;
+    summary.totalHolidays = paidHolidays;
 
-    // User requirement: "then presetn la present aana days + holiday count pani show panu mama ... holiday apo present podanum ma before or after vadhu erukanum mama"
-    const presentWithHolidays = Number((workedDays + paidHolidays).toFixed(3));
-    summary.actualPresentDays = presentWithHolidays;
-    summary.presentDays = presentWithHolidays;
-
-    // Standard working day absent (e.g. 27 Working Days - 23 Present = 4 Absent):
-    const workingDayAbsent = Math.max(0, Number((monthWorkingDays - presentWithHolidays).toFixed(3)));
+    // 3. Standard working day absent (e.g. 25 Working Days - 22 Present = 3 Absent; 25 - 24.5 = 0.5 Absent):
+    const workingDayAbsent = Math.max(0, Number((monthWorkingDays - workedDays).toFixed(3)));
     summary.monthAbsentDays = workingDayAbsent;
     summary.absentDays = workingDayAbsent;
 
     const initialShortfall = workingDayAbsent;
 
-    // Priority 1: Use worked Sundays to equalize month working days:
-    // "present + sunday pakanum adhu 27 vadhichina apidya aduthukoma"
+    // Priority 1: Use worked Sundays & eligible Holidays to equalize month working days:
+    // "present + sunday pakanum adhu 25 vadhichina apidya aduthukoma"
     const totalSundays = summary.totalSundays || 0;
     const sundayUsed = Number(Math.min(initialShortfall, totalSundays).toFixed(3));
+    const remainingShortfallForHoliday = Math.max(0, Number((initialShortfall - sundayUsed).toFixed(3)));
+    const holidayUsed = Number(Math.min(remainingShortfallForHoliday, paidHolidays).toFixed(3));
     summary.sundayUsedForWork = sundayUsed;
-    summary.holidayUsedForWork = 0; // Holidays are already merged directly into Present!
+    summary.holidayUsedForWork = holidayUsed;
 
-    // Surplus Sunday duty beyond month working days carried forward to next month:
-    // "presetn + sunday 27 vita mela pochina next month ku compo ha leave aduthukalam"
-    const sundaySurplus = Math.max(0, Number((totalSundays - sundayUsed).toFixed(3)));
-    summary.compOffNextMonth = sundaySurplus;
+    // Surplus Sunday + Holiday duty beyond month working days carried forward to next month:
+    // "presetn + sunday 25 vita mela pochina next month ku compo ha leave aduthukalam"
+    const weekendDuty = Number((totalSundays + paidHolidays).toFixed(3));
+    const weekendUsed = Number((sundayUsed + holidayUsed).toFixed(3));
+    const weekendSurplus = Math.max(0, Number((weekendDuty - weekendUsed).toFixed(3)));
+    summary.compOffNextMonth = weekendSurplus;
 
-    // Remaining shortfall after using worked Sundays:
-    const remainingShortfall = Math.max(0, Number((initialShortfall - sundayUsed).toFixed(3)));
+    // Remaining shortfall after using worked Sundays & Holidays:
+    const remainingShortfall = Math.max(0, Number((initialShortfall - weekendUsed).toFixed(3)));
 
     // Priority 2: If shortfall still remains, use OT duties:
-    // "27 varalana ot la erdhu aduthukom"
+    // "25 varalana ot la erdhu aduthukom"
     const totalOt = summary.totalOtDuties || 0;
     const otUsedForWork = Number(Math.min(remainingShortfall, totalOt).toFixed(3));
     summary.compOffDays = otUsedForWork;
     summary.compOffOtDuties = otUsedForWork;
 
-    // Uncovered absent days on working days (unpaid absent after Sunday and OT equalization):
+    // Uncovered absent days on working days (unpaid absent after Sunday/Holiday/OT equalization):
     summary.uncoveredAbsentDays = Math.max(0, Number((remainingShortfall - otUsedForWork).toFixed(3)));
 
     // Final Work Days achieved:
-    // presentWithHolidays + sundayUsed + otUsedForWork (equalized to 27 or achieved)
-    summary.finalWorkDays = Number((presentWithHolidays + sundayUsed + otUsedForWork).toFixed(3));
+    // workedDays + sundayUsed + holidayUsed + otUsedForWork (equalized to 25 or achieved)
+    summary.finalWorkDays = Number((workedDays + sundayUsed + holidayUsed + otUsedForWork).toFixed(3));
 
     // Remaining OT to be paid as Overtime:
     summary.paidOtDuties = Math.max(0, Number((totalOt - otUsedForWork).toFixed(3)));
