@@ -315,7 +315,11 @@ export function calculateRecord(
     const workedFullDayDuration = workedMinutes >= (standardShiftMin - graceMinutes) || workedHours >= (fullDayHours - 0.5);
     const workedHalfDayDuration = workedMinutes >= (Math.round(halfDayHours * 60) - graceMinutes) || workedHours >= (halfDayHours - 0.5) || workedMinutes >= 210;
 
-    if (completedShiftWithGrace || workedFullDayDuration || workedHours >= fullDayHours) {
+    // User Rule: Direct night work past 11 PM (23:00) completing 7 hours qualifies as Full Present (1.0)
+    // "Oru logic night la OT 11pm mela OT pakuravaga 7hr pathu erdhaya 1hr present kuduthudu mama"
+    const isDirectNightSevenHours = (inMinutes !== null && (inMinutes >= 22 * 60 || (outMinutes !== null && outMinutes < inMinutes)) && workedMinutes >= (7 * 60 - graceMinutes));
+
+    if (completedShiftWithGrace || workedFullDayDuration || workedHours >= fullDayHours || isDirectNightSevenHours) {
       status = 'PRESENT';
       muster = 'PP';
     } else if (workedHalfDayDuration || workedHours >= halfDayHours) {
@@ -340,6 +344,7 @@ export function calculateRecord(
   // Sunday has no early exit / late go because Sunday is not a standard scheduled shift
   let earlyGoDurationMinutes = 0;
   let lateGoDurationMinutes = 0;
+  let extraDurationMinutes = 0;
 
   if (!isDateSunday && inMinutes !== null && outMinutes !== null) {
     if (shiftRule.isOvernight) {
@@ -363,11 +368,20 @@ export function calculateRecord(
       if (outMinutes < inMinutes) {
         // Stayed past midnight into next day
         const outNormalized = outMinutes + 24 * 60;
-        if (outNormalized > shiftEndMin) {
+        if (inMinutes >= shiftEndMin) {
+          // Direct night arrival after regular day shift ended (e.g. came at 23:00)
+          // If worked >= 7h, first 7h (420m) qualifies as full day shift duty (onDuty = 1.0)
+          // Any remaining duration beyond 7h is overtime!
+          extraDurationMinutes = Math.max(0, (outNormalized - inMinutes) - (7 * 60));
+          lateGoDurationMinutes = extraDurationMinutes;
+        } else if (outNormalized > shiftEndMin) {
           lateGoDurationMinutes = outNormalized - shiftEndMin;
         }
       } else {
-        if (outMinutes > shiftEndMin) {
+        if (inMinutes >= shiftEndMin) {
+          extraDurationMinutes = Math.max(0, (outMinutes - inMinutes) - (7 * 60));
+          lateGoDurationMinutes = extraDurationMinutes;
+        } else if (outMinutes > shiftEndMin) {
           lateGoDurationMinutes = outMinutes - shiftEndMin;
         } else if (outMinutes < shiftEndMin && status !== 'ABSENT') {
           earlyGoDurationMinutes = shiftEndMin - outMinutes;
@@ -388,7 +402,7 @@ export function calculateRecord(
   //   - Early Comer (inMinutes <= shiftStartMin): (shiftStartMin - inMinutes) + LateGo
   //   - Late Comer (inMinutes > shiftStartMin): LateGo (late minutes are recorded in LateCome, NOT deducted from overtime past shift end)
   //   - User Rule: "9hr mela extra time erdha overtime la 8 tha varanum" -> Overtime is capped at maximum 8 hours!
-  let extraDurationMinutes = 0;
+  extraDurationMinutes = 0;
   let overtimeHours = 0;
   let otDuty = 0;
 
@@ -418,6 +432,13 @@ export function calculateRecord(
       overtimeHours = Math.min(8, Math.floor((extraDurationMinutes + 4) / 60));
     } else {
       overtimeHours = 0;
+    }
+
+    // User Rule: Night OT past 11:00 PM (23:00) - 7 hours OT qualifies for +1 hour present bonus -> 8 hours (1.0 Full OT Duty)
+    // "Oru logic night la OT 11pm mela OT pakuravaga 7hr pathu erdhaya 1hr present kuduthudu mama"
+    const isNightOtAfter11Pm = (outMinutes !== null && inMinutes !== null && (outMinutes < inMinutes || outMinutes >= 23 * 60 || inMinutes >= 22 * 60));
+    if (isNightOtAfter11Pm && extraDurationMinutes >= 416 && overtimeHours >= 7) {
+      overtimeHours = 8;
     }
 
     // OT Duty Resolution: "like ot time divide by 8 ... ipo 5 erdha div by 8 pana 0.625 nu varanum mama"
@@ -514,7 +535,11 @@ export function calculateRecord(
     else if (sundayDuty === 0.5) notes = 'Sunday Half Duty (WW)';
     else notes = 'Sunday Week Off (WW)';
   } else {
-    if (status === 'HALF_DAY') notes = 'Half Day (0.5d)';
+    const isNightOtBonus = (outMinutes !== null && inMinutes !== null && (outMinutes < inMinutes || outMinutes >= 23 * 60 || inMinutes >= 22 * 60)) && extraDurationMinutes >= 416 && overtimeHours === 8;
+    const isDirectNight = (inMinutes !== null && (inMinutes >= 22 * 60 || (outMinutes !== null && outMinutes < inMinutes))) && workedMinutes >= (7 * 60 - graceMinutes) && inMinutes >= shiftEndMin;
+    if (isNightOtBonus) notes = `Night OT (Past 11 PM): 7h + 1h Present Bonus -> 8h (1.0 Duty)`;
+    else if (isDirectNight) notes = `Night Shift (Past 11 PM): 7h Full Present (1.0 Duty)`;
+    else if (status === 'HALF_DAY') notes = 'Half Day (0.5d)';
     else if (status === 'ABSENT') notes = 'Absent';
     else if (otDuty > 0) notes = `OT Qualified: ${overtimeHours}h (OT Duty ${otDuty})`;
     else if (isLate) notes = `Late by ${formattedLateCome}`;
