@@ -195,7 +195,7 @@ export const PayrollTimesheetTab: React.FC<PayrollTimesheetTabProps> = ({
                       <td className="py-3 px-2 text-center font-mono font-medium text-purple-700">
                         {s.totalOtDuties !== undefined ? `${s.totalOtDuties}` : '0'}
                       </td>
-                      <td className="py-3 px-2 text-center font-mono font-semibold text-rose-600">{s.monthAbsentDays ?? 0}</td>
+                      <td className="py-3 px-2 text-center font-mono font-semibold text-rose-600">{s.monthAbsentDays ?? s.absentDays ?? 0}</td>
                       <td className="py-3 px-2 text-center font-mono font-medium text-indigo-700">{s.totalSundays || 0}</td>
                       <td className="py-3 px-2 text-center font-mono font-medium text-teal-700">{s.totalHolidays || 0}</td>
                       <td className="py-3 px-2 text-center font-mono font-bold text-amber-600 bg-amber-50/30">

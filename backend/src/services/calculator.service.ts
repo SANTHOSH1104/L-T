@@ -311,13 +311,14 @@ export function calculateRecord(
         ? (outMinutes >= shiftEndMin || (outMinutes < shiftStartMin && outMinutes >= shiftEndMin - graceMinutes))
         : (outMinutes >= shiftEndMin - graceMinutes));
 
-    // 2. Worked duration matches full day (allowing for grace window or late arrival within shift, e.g. >= standardShiftMin - graceMinutes or >= fullDayHours - 1.0)
-    const workedFullDayDuration = workedMinutes >= (standardShiftMin - graceMinutes) || workedHours >= (fullDayHours - 1.0);
+    // 2. Worked duration matches full day (allowing for grace window or late arrival within shift, e.g. >= standardShiftMin - graceMinutes or >= fullDayHours - 0.5)
+    const workedFullDayDuration = workedMinutes >= (standardShiftMin - graceMinutes) || workedHours >= (fullDayHours - 0.5);
+    const workedHalfDayDuration = workedMinutes >= (Math.round(halfDayHours * 60) - graceMinutes) || workedHours >= (halfDayHours - 0.5) || workedMinutes >= 210;
 
     if (completedShiftWithGrace || workedFullDayDuration || workedHours >= fullDayHours) {
       status = 'PRESENT';
       muster = 'PP';
-    } else if (workedHours >= halfDayHours) {
+    } else if (workedHalfDayDuration || workedHours >= halfDayHours) {
       status = 'HALF_DAY';
       muster = 'PA';
     } else {
@@ -470,10 +471,13 @@ export function calculateRecord(
     // SUNDAY RULE:
     // "Muster la WW sunday eruku adhuku HL nu chaneg paniko"
     muster = 'HL';
-    if (workedHours >= fullDayHours || musterUpper === 'PP' || workedMinutes >= (standardShiftMin - graceMinutes) || workedHours >= 8.0) {
+    const workedFullDaySunday = workedHours >= fullDayHours || musterUpper === 'PP' || workedMinutes >= (standardShiftMin - graceMinutes) || workedHours >= 7.5;
+    const workedHalfDaySunday = workedHours >= halfDayHours || musterUpper === 'PA' || musterUpper === 'AP' || workedMinutes >= (Math.round(halfDayHours * 60) - graceMinutes) || workedHours >= 3.5 || workedMinutes >= 210;
+
+    if (workedFullDaySunday) {
       sundayDuty = 1;
       status = 'PRESENT';
-    } else if (workedHours >= halfDayHours || musterUpper === 'PA' || musterUpper === 'AP' || workedHours >= 4.0) {
+    } else if (workedHalfDaySunday) {
       sundayDuty = 0.5;
       status = 'HALF_DAY';
     } else {
@@ -632,8 +636,12 @@ export function generateEmployeeSummaries(
     const actualPresent = summary.totalOnDuty ?? summary.presentDays;
     summary.actualPresentDays = actualPresent;
 
-    // Standard working day absent before adjustments:
-    const initialShortfall = Math.max(0, Number((monthWorkingDays - actualPresent).toFixed(3)));
+    // Standard working day absent before adjustments (e.g. 25 Working Day - 22 Present = 3 Absent; 25 - 24.5 = 0.5 Absent):
+    const workingDayAbsent = Math.max(0, Number((monthWorkingDays - actualPresent).toFixed(3)));
+    summary.monthAbsentDays = workingDayAbsent;
+    summary.absentDays = workingDayAbsent;
+
+    const initialShortfall = workingDayAbsent;
 
     // Total weekend / holiday duty available to equalize month working days:
     const totalSundays = summary.totalSundays || 0;
@@ -665,8 +673,8 @@ export function generateEmployeeSummaries(
     summary.compOffDays = otUsedForWork;
     summary.compOffOtDuties = otUsedForWork;
 
-    // Final absent days on working days (uncovered absent):
-    summary.monthAbsentDays = Math.max(0, Number((remainingShortfall - otUsedForWork).toFixed(3)));
+    // Uncovered absent days on working days (unpaid absent after Sunday/Holiday/OT equalization):
+    summary.uncoveredAbsentDays = Math.max(0, Number((remainingShortfall - otUsedForWork).toFixed(3)));
 
     // Final Work Days achieved:
     // actualPresent + weekendUsedForWork + otUsedForWork

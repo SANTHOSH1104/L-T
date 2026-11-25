@@ -98,6 +98,7 @@ export interface EmployeeSummary {
   compOffNextMonth?: number;
   sundayUsedForWork?: number;
   holidayUsedForWork?: number;
+  uncoveredAbsentDays?: number;
 }
 
 export interface ColumnMapping {
