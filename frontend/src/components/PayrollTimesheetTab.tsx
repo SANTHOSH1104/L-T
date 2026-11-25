@@ -167,16 +167,13 @@ export const PayrollTimesheetTab: React.FC<PayrollTimesheetTabProps> = ({
                 <th className="py-3 px-2 text-center text-emerald-800 font-bold bg-emerald-50/40" title="Final Effective Work Days (Present + Comp-Off)">total work paid</th>
                 <th className="py-3 px-2 text-center text-purple-900 font-bold bg-purple-50/50" title="Remaining OT Duties to be Paid">OT paid</th>
                 <th className="py-3 px-2 text-center text-teal-800 font-bold bg-teal-50/40" title="Surplus Sunday Comp-Off Carried Forward to Next Month">Comp-Off (Next Month)</th>
-                <th className="py-3 px-3 text-center bg-emerald-100/60 font-black text-emerald-900">
-                  Total Payable Days
-                </th>
                 <th className="py-3 px-3 text-center rounded-r-lg">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredAndSorted.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="text-center py-8 text-slate-400">
+                  <td colSpan={12} className="text-center py-8 text-slate-400">
                     No employee summaries available.
                   </td>
                 </tr>
@@ -215,9 +212,6 @@ export const PayrollTimesheetTab: React.FC<PayrollTimesheetTabProps> = ({
                             +{s.compOffNextMonth}
                           </span>
                         ) : '-'}
-                      </td>
-                      <td className="py-3 px-3 text-center font-mono font-black text-emerald-900 bg-emerald-100/50">
-                        {s.netPayableDays}
                       </td>
                       <td className="py-3 px-3 text-center">
                         <Button

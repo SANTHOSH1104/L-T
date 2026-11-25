@@ -247,7 +247,6 @@ export function exportPayrollSummaryToExcel(summaries: EmployeeSummary[], filena
     'total work paid': s.finalWorkDays ?? (s.totalOnDuty ?? s.presentDays),
     'OT paid': s.paidOtDuties ?? (s.totalOtDuties ?? 0),
     'Comp-Off (Next Month)': s.compOffNextMonth ?? 0,
-    'Total Payable Days': s.netPayableDays,
   }));
 
   const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -332,7 +331,6 @@ export function exportMasterReportToExcel(
       'total work paid': s.finalWorkDays ?? (s.totalOnDuty ?? s.presentDays),
       'OT paid': s.paidOtDuties ?? (s.totalOtDuties ?? 0),
       'Comp-Off (Next Month)': s.compOffNextMonth ?? 0,
-      'Total Payable Days': s.netPayableDays,
     }));
     const payrollSheet = XLSX.utils.json_to_sheet(payrollData);
     XLSX.utils.book_append_sheet(workbook, payrollSheet, 'Payroll Summary');
