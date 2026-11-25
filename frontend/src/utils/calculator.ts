@@ -709,13 +709,13 @@ export function generateEmployeeSummaries(
 }
 
 /**
- * Strict Holiday Sandwich Rule Evaluator:
- * "mama rendu naluma vadhu erukanum before and after must vadhu erukanum mama"
+ * Holiday Attendance Rule Evaluator:
+ * "renduthula adhula one day vadhu erukalaya present kudu mama before or after vadha paid..... bwfore and after two days ma varalana paid ila logic change panu mama"
  * 1. Sunday Rule: If Sunday is in-between, skip Sunday and check the real working day before/after.
  * 2. Punch / Half Day Rule: "half day vadha kuda ok tha punch pani erukanum" -> Present or Half Day qualifies as worked.
  * 3. Paid Holiday:
- *    - Both Before AND After must be attended -> Paid Holiday: muster = 'HL', status = 'HOLIDAY', holiday = 1.0, dayTotal = 1.0.
- *    - If either Before or After was NOT attended -> Unpaid: muster = 'AA', status = 'ABSENT', holiday = 0.0, dayTotal = 0.0.
+ *    - EITHER Before OR After is attended -> Paid Holiday: muster = 'HL', status = 'HOLIDAY', holiday = 1.0, dayTotal = 1.0.
+ *    - If BOTH Before AND After were NOT attended -> Unpaid: muster = 'AA', status = 'ABSENT', holiday = 0.0, dayTotal = 0.0.
  *    - If employee actually worked on the holiday itself -> muster = 'HP', status = 'PRESENT', holiday = 1.0, dayTotal = 1.0 + otDuty.
  */
 export function applyHolidaySandwichRule(
@@ -825,8 +825,11 @@ export function applyHolidaySandwichRule(
     const workedBefore = prevWorkingDate ? isWorkedOrPunched(empDateMap?.get(prevWorkingDate)) : false;
     const workedAfter = nextWorkingDate ? isWorkedOrPunched(empDateMap?.get(nextWorkingDate)) : false;
 
-    // Strict Sandwich Rule: Both Before AND After MUST be attended
-    const isEligible = workedBefore && workedAfter;
+    // Holiday Attendance Rule:
+    // If attended EITHER Before OR After -> Paid Holiday (1.0 Duty)
+    // If absent on BOTH Before AND After -> Unpaid Holiday (0.0 Duty, Absent)
+    // "renduthula adhula one day vadhu erukalaya present kudu mama before or after vadha paid..... bwfore and after two days ma varalana paid ila"
+    const isEligible = workedBefore || workedAfter;
 
     if (isEligible && holiday.isPaid !== false) {
       // Eligible -> Paid Holiday (1.0 Duty)
@@ -844,10 +847,10 @@ export function applyHolidaySandwichRule(
         totalHours: 0,
         overtimeHours: 0,
         otDuty: 0,
-        notes: `${holiday.name} (Paid Holiday: Sandwich Rule Passed)`,
+        notes: `${holiday.name} (Paid Holiday: Attended Before/After)`,
       };
     } else {
-      // Not Eligible -> Absent (0.0 Duty, Unpaid)
+      // Not Eligible -> Absent (0.0 Duty, Unpaid - both Before & After absent)
       return {
         ...record,
         inTime: '--:--',
@@ -862,7 +865,7 @@ export function applyHolidaySandwichRule(
         totalHours: 0,
         overtimeHours: 0,
         otDuty: 0,
-        notes: `${holiday.name} (Unpaid Holiday: Absent Before/After)`,
+        notes: `${holiday.name} (Unpaid Holiday: Absent Both Before & After)`,
       };
     }
   });
