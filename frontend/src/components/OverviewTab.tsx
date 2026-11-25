@@ -332,10 +332,10 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                     ? 'bg-indigo-50/70 border-indigo-200 text-indigo-700 hover:border-indigo-400'
                     : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
                 }`}
-                title={`${d} ${isHoliday ? '(Company Holiday)' : isSunday ? '(Sunday HL)' : ''}`}
+                title={`${d} ${isHoliday ? '(Company Holiday)' : isSunday ? '(Sunday WW)' : ''}`}
               >
                 <span className={`text-[10px] font-semibold uppercase ${isSelected ? 'text-indigo-200' : 'text-slate-400'}`}>
-                  {isHoliday ? '🎉 HL' : isSunday ? '☀️ HL' : `Day`}
+                  {isHoliday ? '🎉 HL' : isSunday ? '☀️ WW' : `Day`}
                 </span>
                 <span className="text-sm sm:text-base font-extrabold leading-tight">
                   {dayNum}
@@ -365,7 +365,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                 ) : inspectorStats.isSunday ? (
                   <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-300 flex items-center gap-1">
                     <Sun className="w-3.5 h-3.5" />
-                    <span>Sunday Holiday (HL)</span>
+                    <span>Sunday Week Off (WW)</span>
                   </span>
                 ) : (
                   <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
@@ -378,7 +378,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                 {inspectorStats.isHoliday
                   ? `All ${inspectorStats.total} staff members credited 1.0 day paid holiday (Muster 'HL' / Worked 'HP').`
                   : inspectorStats.isSunday
-                  ? `Sunday marked as 'HL'. Any employees who punched in receive Sunday duty credit and worked hours in Extra Time.`
+                  ? `Sunday marked as 'WW'. Any employees who punched in receive Sunday duty credit and worked hours in Extra Time.`
                   : `Total ${inspectorStats.total} employee biometric records evaluated for this date.`}
               </p>
             </div>

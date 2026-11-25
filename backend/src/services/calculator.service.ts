@@ -202,7 +202,7 @@ export function calculateRecord(
     const isOnDuty = rawMuster === 'OD';
     const holidayPaid = isHoliday && (companyHoliday ? companyHoliday.isPaid !== false : true);
     const status: AttendanceStatus = (isHoliday || isWeekOff) ? 'HOLIDAY' : isOnDuty ? 'PRESENT' : 'ABSENT';
-    const musterCode = (isHoliday || isWeekOff) ? 'HL' : (rawMuster || 'AA');
+    const musterCode = isHoliday ? 'HL' : isWeekOff ? 'WW' : (rawMuster || 'AA');
     const dayTotal = isHoliday ? (holidayPaid ? 1 : 0) : isOnDuty ? 1 : 0;
 
     return {
@@ -233,13 +233,13 @@ export function calculateRecord(
       isEarlyExit: false,
       otMinutes: 0,
       otHours: 0,
-      notes: isHoliday ? (companyHoliday ? `${companyHoliday.name} (Holiday)` : 'Holiday') : isWeekOff ? 'Sunday Holiday (HL)' : isOnDuty ? 'On Duty' : 'Absent (No Punch)',
+      notes: isHoliday ? (companyHoliday ? `${companyHoliday.name} (Holiday)` : 'Holiday') : isWeekOff ? 'Sunday Week Off (WW)' : isOnDuty ? 'On Duty' : 'Absent (No Punch)',
     };
   }
 
   // Single punch missing
   if (inMinutes === null || outMinutes === null) {
-    const musterCode = isDateSunday ? 'HL' : (rawMuster || 'MISSED');
+    const musterCode = isConfiguredHoliday ? 'HL' : isDateSunday ? 'WW' : (rawMuster || 'MISSED');
     return {
       id,
       empId,
@@ -469,8 +469,8 @@ export function calculateRecord(
     sundayDuty = 0;
   } else if (isDateSunday) {
     // SUNDAY RULE:
-    // "Muster la WW sunday eruku adhuku HL nu chaneg paniko"
-    muster = 'HL';
+    // User requirement: "muster la sunday WW nu podu mama HL nu eruku"
+    muster = 'WW';
     const workedFullDaySunday = workedHours >= fullDayHours || musterUpper === 'PP' || workedMinutes >= (standardShiftMin - graceMinutes) || workedHours >= 7.5;
     const workedHalfDaySunday = workedHours >= halfDayHours || musterUpper === 'PA' || musterUpper === 'AP' || workedMinutes >= (Math.round(halfDayHours * 60) - graceMinutes) || workedHours >= 3.5 || workedMinutes >= 210;
 
@@ -510,9 +510,9 @@ export function calculateRecord(
     notes = companyHoliday ? `Worked on Holiday: ${companyHoliday.name}` : 'Worked on Holiday';
     if (otDuty > 0) notes += ` + OT (${overtimeHours}h)`;
   } else if (isDateSunday) {
-    if (sundayDuty === 1) notes = 'Sunday Full Duty (HL)';
-    else if (sundayDuty === 0.5) notes = 'Sunday Half Duty (HL)';
-    else notes = 'Sunday Holiday (HL)';
+    if (sundayDuty === 1) notes = 'Sunday Full Duty (WW)';
+    else if (sundayDuty === 0.5) notes = 'Sunday Half Duty (WW)';
+    else notes = 'Sunday Week Off (WW)';
   } else {
     if (status === 'HALF_DAY') notes = 'Half Day (0.5d)';
     else if (status === 'ABSENT') notes = 'Absent';

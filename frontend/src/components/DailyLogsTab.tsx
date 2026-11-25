@@ -278,7 +278,7 @@ export const DailyLogsTab: React.FC<DailyLogsTabProps> = ({
             { id: 'HALF_DAY', label: '🟡 Half Day' },
             { id: 'ABSENT', label: '🔴 Absent' },
             { id: 'HOLIDAY', label: '🎉 Holiday (HL/HP)' },
-            { id: 'SUNDAY', label: '☀️ Sunday (HL)' },
+            { id: 'SUNDAY', label: '☀️ Sunday (WW)' },
             { id: 'OT', label: '🟣 Overtime' },
             { id: 'LATE', label: '⚠️ Late In' },
           ].map(tab => (
